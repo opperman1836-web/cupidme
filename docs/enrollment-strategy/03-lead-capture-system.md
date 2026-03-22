@@ -88,10 +88,10 @@ You're all set to enrol in the Certified Caregiver Programme!
 Here are your payment details:
 
 🏦 BANK DETAILS:
-Bank: [BANK NAME]
+Bank: Capitec Business
 Account Name: New Skills Academy (Pty) Ltd
-Account Number: [ACCOUNT NUMBER]
-Branch Code: [BRANCH CODE]
+Account Number: 1052181562
+Branch Code: 470010
 Reference: [THEIR NAME + PHONE NUMBER]
 
 💰 Amount: R2,000
@@ -161,7 +161,7 @@ SECTION 3: ENROLLMENT
 CONFIRMATION PAGE:
 "Thank you for your interest! 🎉
 We'll contact you within 1 hour on WhatsApp.
-If urgent, WhatsApp 'ENROL' to [PHONE NUMBER]"
+If urgent, WhatsApp 'ENROL' to 027 760 782 238"
 ```
 
 ---

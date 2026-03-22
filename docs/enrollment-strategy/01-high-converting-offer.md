@@ -47,10 +47,10 @@
 ## CALL-TO-ACTION (CTA)
 
 ### Primary CTA:
-**"WhatsApp 'CAREGIVER' to [PHONE NUMBER] to secure your spot NOW"**
+**"WhatsApp 'CAREGIVER' to 027 760 782 238 to secure your spot NOW"**
 
 ### Secondary CTAs:
-- "Call [PHONE NUMBER] — lines open until 8pm tonight"
+- "Call 027 760 782 238 — lines open until 8pm tonight"
 - "Click the link to register: [REGISTRATION LINK]"
 - "Comment 'INFO' below and we'll send you the details"
 
@@ -76,8 +76,8 @@ New Skills Academy is enrolling NOW for our Caregiver Programme!
 
 ⚠️ Only 30 seats available — once full, price goes back to R5,500
 
-📲 WhatsApp "CAREGIVER" to [PHONE NUMBER] to secure your spot
-📞 Or call [PHONE NUMBER]
+📲 WhatsApp "CAREGIVER" to 027 760 782 238 to secure your spot
+📞 Or call 027 760 782 238
 
 Start your healthcare career TODAY!
 #CaregiverCourse #HealthCare #NewSkillsAcademy #SouthAfrica #JobSkills
@@ -96,7 +96,7 @@ Earn R4,000-R8,000/month helping people in your community.
 
 New Skills Academy — R2,000 All-In (normally R5,500!)
 
-📲 WhatsApp "START" to [PHONE NUMBER]
+📲 WhatsApp "START" to 027 760 782 238
 ```
 
 ### For Parents/Adults:
@@ -109,7 +109,7 @@ Home-Based Care + Health Care Assistant — Certified.
 Only R2,000 this week (Save R3,500!)
 FREE: First Aid + HIV Counselling courses included.
 
-📲 WhatsApp "CAREGIVER" to [PHONE NUMBER]
+📲 WhatsApp "CAREGIVER" to 027 760 782 238
 ```
 
 ### For Rural Communities:
@@ -122,5 +122,5 @@ First Aid, HIV Counselling & more.
 R2,000 special — includes ALL course materials + certificates.
 Study at your own pace. Start immediately.
 
-📲 WhatsApp "LEARN" to [PHONE NUMBER]
+📲 WhatsApp "LEARN" to 027 760 782 238
 ```

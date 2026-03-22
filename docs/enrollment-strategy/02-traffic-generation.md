@@ -33,8 +33,8 @@ Train for a career in healthcare! Our all-inclusive programme covers:
 ✔️ Self-paced learning available
 ✔️ Job-ready in 3 months
 
-📲 WhatsApp "CAREGIVER" to [PHONE NUMBER]
-📞 Call: [PHONE NUMBER]
+📲 WhatsApp "CAREGIVER" to 027 760 782 238
+📞 Call: 027 760 782 238
 
 #CaregiverTraining #HealthCare #SouthAfrica
 ```
@@ -61,7 +61,7 @@ You'll also get:
 Normally R5,500 — This week R2,000!
 Only 30 seats left.
 
-📲 WhatsApp "FIRSTAID" to [PHONE NUMBER]
+📲 WhatsApp "FIRSTAID" to 027 760 782 238
 ```
 
 ### Listing 3: Job-Focused Angle
@@ -85,7 +85,7 @@ Everything included for R2,000 (normally R5,500!)
 ✅ Certificate provided
 ✅ No matric needed
 
-📲 WhatsApp "JOB" to [PHONE NUMBER]
+📲 WhatsApp "JOB" to 027 760 782 238
 ```
 
 **Post all 3 listings NOW. Renew every 3 days. Post in multiple cities.**
@@ -158,7 +158,7 @@ If you're looking for a fresh start, New Skills Academy is enrolling NOW.
 
 Only 30 seats at this price.
 
-📲 WhatsApp "CAREGIVER" to [PHONE NUMBER]
+📲 WhatsApp "CAREGIVER" to 027 760 782 238
 
 #Caregiver #Jobs #SouthAfrica #SkillsTraining
 ```
@@ -180,8 +180,8 @@ What you get:
 
 No matric required. Start immediately.
 
-📲 WhatsApp "INFO" to [PHONE NUMBER]
-📞 Call: [PHONE NUMBER]
+📲 WhatsApp "INFO" to 027 760 782 238
+📞 Call: 027 760 782 238
 ```
 
 **Version C — Question Hook:**
@@ -197,7 +197,7 @@ New Skills Academy can get you certified in just 3 months.
 ✅ Home-Based Care + First Aid + HIV Counselling
 📜 Certificate included
 
-Comment "INFO" or WhatsApp [PHONE NUMBER]
+Comment "INFO" or WhatsApp 027 760 782 238
 
 Only 30 spots left!
 ```
@@ -293,9 +293,9 @@ REQUIREMENTS:
 • Passion for helping others
 
 HOW TO ENROL:
-WhatsApp "CAREGIVER" to [PHONE NUMBER]
-Call: [PHONE NUMBER]
-Email: [EMAIL]
+WhatsApp "CAREGIVER" to 027 760 782 238
+Call: 027 760 782 238
+Email: info@newskillsacademy.org.za
 
 Only 30 spots available at this special price!
 Classes start Monday — secure your spot today.
@@ -332,7 +332,7 @@ HASHTAGS: #unemployed #caregiverjobs #southafrica #motivation #career #fyp
 HOOK: "This course normally costs R5,500..."
 CONTENT: Show price slash animation
 TEXT OVERLAY: "But right now it's only R2,000! (30 spots left)"
-CTA: "WhatsApp [NUMBER] before it's too late!"
+CTA: "WhatsApp 027 760 782 238 before it's too late!"
 SOUND: Trending "no way" reaction audio
 HASHTAGS: #discount #education #healthcare #southafrica #caregiver #fyp
 ```

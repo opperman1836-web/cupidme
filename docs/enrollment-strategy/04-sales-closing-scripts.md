@@ -121,10 +121,10 @@ Great, [Name]! 🎉 I'm so excited for you!
 Here are the payment details to secure your spot:
 
 🏦 BANK DETAILS:
-Bank: [BANK NAME]
+Bank: Capitec Business
 Account Name: New Skills Academy (Pty) Ltd
-Account Number: [ACCOUNT NUMBER]
-Branch Code: [BRANCH CODE]
+Account Number: 1052181562
+Branch Code: 470010
 Reference: [NAME + PHONE]
 
 💰 Amount: R2,000
@@ -298,7 +298,7 @@ We still have a few spots left at the R2,000 special price,
 and for every friend you refer who enrols, you get R200 off
 your next course!
 
-Just share my number ([PHONE NUMBER]) with them, or send me
+Just share my number (027 760 782 238) with them, or send me
 their name and I'll reach out.
 
 Thank you for being part of New Skills Academy! 🙏

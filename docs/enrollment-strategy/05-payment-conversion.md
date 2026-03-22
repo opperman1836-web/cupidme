@@ -14,19 +14,19 @@ Here are the payment options:
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 💳 OPTION 1: EFT / BANK TRANSFER
-Bank: [BANK NAME]
+Bank: Capitec Business
 Account Name: New Skills Academy (Pty) Ltd
-Account Number: [ACCOUNT NUMBER]
-Branch Code: [BRANCH CODE]
+Account Number: 1052181562
+Branch Code: 470010
 Account Type: Business/Cheque
 Reference: [FIRST NAME]-[PHONE LAST 4 DIGITS]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 🏦 OPTION 2: CASH DEPOSIT AT BANK
-Go to any [BANK NAME] branch
+Go to any Capitec Business branch
 Account Name: New Skills Academy (Pty) Ltd
-Account Number: [ACCOUNT NUMBER]
+Account Number: 1052181562
 Reference: [FIRST NAME]-[PHONE LAST 4 DIGITS]
 (Tell the teller it's a cash deposit)
 
@@ -34,7 +34,7 @@ Reference: [FIRST NAME]-[PHONE LAST 4 DIGITS]
 
 📱 OPTION 3: MOBILE TRANSFER / E-WALLET
 Capitec Pay / FNB eWallet / Shoprite Money Transfer
-Send to: [PHONE NUMBER]
+Send to: 027 760 782 238
 Amount: R2,000
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -122,8 +122,8 @@ Payment Status: ✅ CONFIRMED
 2. You'll be added to our Study Support WhatsApp Group
 3. Your classes begin on [DATE] / You can start self-paced study immediately
 
-📞 Support Contact: [PHONE NUMBER]
-📧 Email: [EMAIL]
+📞 Support Contact: 027 760 782 238
+📧 Email: info@newskillsacademy.org.za
 
 Save this message for your records!
 
@@ -146,7 +146,7 @@ This could be because:
 Could you please double-check:
 1. Did you use the reference: [REFERENCE]?
 2. Was the amount exactly R2,000?
-3. Did you send to the correct account number: [ACCOUNT NUMBER]?
+3. Did you send to the correct account number: 1052181562?
 
 If you deposited cash, it might just need a bit more time.
 Let me check again in 1-2 hours.
@@ -198,8 +198,8 @@ STATUS: ✅ PAID IN FULL
 
 New Skills Academy (Pty) Ltd
 Reg No: [COMPANY REG NUMBER]
-Tel: [PHONE NUMBER]
-Email: [EMAIL]
+Tel: 027 760 782 238
+Email: info@newskillsacademy.org.za
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 

@@ -23,7 +23,7 @@ focused on the Certified Caregiver Programme.
 
 ## Quick Start (Do These First)
 
-1. Replace all `[PHONE NUMBER]`, `[BANK NAME]`, `[ACCOUNT NUMBER]`, `[EMAIL]` placeholders
+1. All contact/banking details have been filled in (027 760 782 238, Capitec Business, 1052181562)
 2. Set up WhatsApp Business profile
 3. Create Google Sheet tracker
 4. Join 20+ Facebook Groups
