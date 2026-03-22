@@ -2,6 +2,7 @@
   "name": "cupidme",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "description": "CupidMe.org - Where Love Is Earned",
   "workspaces": [
     "apps/*",
