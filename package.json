@@ -1,27 +1,20 @@
 {
-  "name": "cupidme",
-  "version": "0.1.0",
+  "name": "new-skills-marketing",
+  "version": "1.0.0",
   "private": true,
-  "packageManager": "npm@10.0.0",
-  "description": "CupidMe.org - Where Love Is Earned",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "dev:api": "npm run dev --workspace=@cupidme/api",
-    "dev:web": "npm run dev --workspace=@cupidme/web",
-    "build:api": "npm run build --workspace=@cupidme/api",
-    "build:web": "npm run build --workspace=@cupidme/web"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.20",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
-    "typescript": "^5.4.0"
-  },
-  "engines": {
-    "node": ">=20.0.0"
+    "@types/node": "25.5.0",
+    "@types/react": "19.2.14",
+    "typescript": "5.9.3"
   }
 }
