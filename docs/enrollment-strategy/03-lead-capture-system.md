@@ -161,7 +161,7 @@ SECTION 3: ENROLLMENT
 CONFIRMATION PAGE:
 "Thank you for your interest! 🎉
 We'll contact you within 1 hour on WhatsApp.
-If urgent, WhatsApp 'ENROL' to 027 760 782 238"
+If urgent, WhatsApp 'ENROL' to 0760782238"
 ```
 
 ---

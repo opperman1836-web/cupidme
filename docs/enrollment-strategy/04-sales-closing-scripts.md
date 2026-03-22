@@ -298,7 +298,7 @@ We still have a few spots left at the R2,000 special price,
 and for every friend you refer who enrols, you get R200 off
 your next course!
 
-Just share my number (027 760 782 238) with them, or send me
+Just share my number (0760782238) with them, or send me
 their name and I'll reach out.
 
 Thank you for being part of New Skills Academy! 🙏

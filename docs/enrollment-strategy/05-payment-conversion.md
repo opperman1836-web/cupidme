@@ -34,7 +34,7 @@ Reference: [FIRST NAME]-[PHONE LAST 4 DIGITS]
 
 📱 OPTION 3: MOBILE TRANSFER / E-WALLET
 Capitec Pay / FNB eWallet / Shoprite Money Transfer
-Send to: 027 760 782 238
+Send to: 0760782238
 Amount: R2,000
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -122,7 +122,7 @@ Payment Status: ✅ CONFIRMED
 2. You'll be added to our Study Support WhatsApp Group
 3. Your classes begin on [DATE] / You can start self-paced study immediately
 
-📞 Support Contact: 027 760 782 238
+📞 Support Contact: 0760782238
 📧 Email: info@newskillsacademy.org.za
 
 Save this message for your records!
@@ -198,7 +198,7 @@ STATUS: ✅ PAID IN FULL
 
 New Skills Academy (Pty) Ltd
 Reg No: [COMPANY REG NUMBER]
-Tel: 027 760 782 238
+Tel: 0760782238
 Email: info@newskillsacademy.org.za
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
