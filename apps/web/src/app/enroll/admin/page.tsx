@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Phone, MapPin, Clock, Users, CheckCircle, XCircle, MessageCircle, LogIn } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { RefreshCw, Phone, MapPin, Clock, Users, CheckCircle, MessageCircle, LogIn } from 'lucide-react';
 
 interface Lead {
   id: string;
@@ -28,42 +28,70 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [filter, setFilter] = useState<string>('all');
+  const [error, setError] = useState('');
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/leads', {
         headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
       });
+      if (!res.ok) {
+        setLeads([]);
+        setError('Failed to load leads');
+        return;
+      }
       const data = await res.json();
       setLeads(data.leads || []);
     } catch {
-      // silent fail
+      setLeads([]);
+      setError('Network error — could not reach server');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (authenticated) fetchLeads();
-  }, [authenticated, fetchLeads]);
+  const updateStatus = useCallback(async (id: string, status: string) => {
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${ADMIN_TOKEN}`,
+        },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!res.ok) {
+        console.error('Failed to update lead status');
+        return;
+      }
+      // Refresh after successful update
+      await fetchLeads();
+    } catch {
+      console.error('Network error updating lead status');
+    }
+  }, [fetchLeads]);
 
-  const updateStatus = async (id: string, status: string) => {
-    await fetch('/api/leads', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${ADMIN_TOKEN}`,
-      },
-      body: JSON.stringify({ id, status }),
-    });
-    fetchLeads();
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password === 'newskills2024') {
       setAuthenticated(true);
+      // Fetch leads only after user explicitly logs in
+      try {
+        setLoading(true);
+        const res = await fetch('/api/leads', {
+          headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLeads(data.leads || []);
+        }
+      } catch {
+        // Silently fail — user can click Refresh
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -123,6 +151,12 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
+            {error}
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[

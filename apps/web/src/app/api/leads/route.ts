@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminSupabase } from '@/lib/supabase/admin';
 
 const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN || 'nsa-admin-2024';
 
-// ── In-memory fallback when Supabase is not configured ──
+// ── In-memory fallback (always available, no imports needed) ──
 interface InMemoryLead {
   id: string;
   full_name: string;
@@ -22,41 +21,57 @@ function generateId(): string {
   return `mem-${Date.now()}-${nextId++}`;
 }
 
+// Lazy-load Supabase to prevent cold-start crashes if the package fails to load
+async function getSupabase() {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return null;
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    return createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  } catch (err) {
+    console.error('[leads] Failed to load Supabase client:', err);
+    return null;
+  }
+}
+
 // GET - Fetch all leads (admin only)
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${ADMIN_TOKEN}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
-    const supabase = createAdminSupabase();
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${ADMIN_TOKEN}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabase = await getSupabase();
 
     if (!supabase) {
-      // In-memory fallback
       const sorted = [...inMemoryLeads].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       return NextResponse.json({ leads: sorted, total: sorted.length, storage: 'memory' });
     }
 
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from('leads')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('[leads] Supabase GET error:', error.message);
-      throw error;
+      return NextResponse.json({ leads: [], total: 0, error: error.message }, { status: 200 });
     }
 
-    return NextResponse.json({ leads: data, total: count });
+    return NextResponse.json({ leads: data ?? [], total: data?.length ?? 0 });
   } catch (err) {
-    console.error('[leads] Failed to fetch leads:', err);
-    return NextResponse.json(
-      { error: 'Failed to fetch leads', leads: [], total: 0 },
-      { status: 500 }
-    );
+    console.error('[leads] GET crashed:', err);
+    return NextResponse.json({ leads: [], total: 0, error: 'Internal error' }, { status: 200 });
   }
 }
 
@@ -66,7 +81,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { fullName, phone, location, courseInterest } = body;
 
-    // Validation
     if (!fullName || !phone || !location || !courseInterest) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
@@ -75,10 +89,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Input too long' }, { status: 400 });
     }
 
-    const supabase = createAdminSupabase();
+    const supabase = await getSupabase();
 
     if (!supabase) {
-      // In-memory fallback
       const id = generateId();
       const now = new Date().toISOString();
       inMemoryLeads.push({
@@ -91,7 +104,7 @@ export async function POST(request: NextRequest) {
         created_at: now,
         updated_at: now,
       });
-      console.log(`[leads] Stored lead in memory (id=${id}). Total: ${inMemoryLeads.length}`);
+      console.log(`[leads] Stored in memory (id=${id}). Total: ${inMemoryLeads.length}`);
       return NextResponse.json({ success: true, id, storage: 'memory' }, { status: 201 });
     }
 
@@ -109,24 +122,37 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[leads] Supabase INSERT error:', error.message);
-      throw error;
+      // Fall back to memory on DB error
+      const id = generateId();
+      const now = new Date().toISOString();
+      inMemoryLeads.push({
+        id,
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        location: location.trim(),
+        course_interest: courseInterest.trim(),
+        status: 'new',
+        created_at: now,
+        updated_at: now,
+      });
+      return NextResponse.json({ success: true, id, storage: 'memory-fallback' }, { status: 201 });
     }
 
     return NextResponse.json({ success: true, id: data.id }, { status: 201 });
   } catch (err) {
-    console.error('[leads] Failed to create lead:', err);
+    console.error('[leads] POST crashed:', err);
     return NextResponse.json({ error: 'Failed to submit application' }, { status: 500 });
   }
 }
 
 // PATCH - Update lead status (admin only)
 export async function PATCH(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${ADMIN_TOKEN}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${ADMIN_TOKEN}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, status } = body;
 
@@ -139,10 +165,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const supabase = createAdminSupabase();
+    const supabase = await getSupabase();
 
     if (!supabase) {
-      // In-memory fallback
       const lead = inMemoryLeads.find((l) => l.id === id);
       if (!lead) {
         return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
@@ -159,12 +184,12 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       console.error('[leads] Supabase PATCH error:', error.message);
-      throw error;
+      return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[leads] Failed to update lead:', err);
+    console.error('[leads] PATCH crashed:', err);
     return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 });
   }
 }
