@@ -1,5 +1,8 @@
-import { redirect } from 'next/navigation';
+'use client';
 
-export default function HomePage() {
-  redirect('/enroll');
+export default function Home() {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/enroll';
+  }
+  return null;
 }
