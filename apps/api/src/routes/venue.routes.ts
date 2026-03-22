@@ -8,18 +8,20 @@ import {
 
 export const venueRoutes = Router();
 
-// Public
+// Public — specific routes BEFORE param routes
 venueRoutes.get('/', getVenues);
-venueRoutes.get('/:venueId', getVenue);
 
-// Authenticated
+// Authenticated routes — must come before /:venueId catch-all
 venueRoutes.use(requireAuth);
 
-venueRoutes.post('/', createVenue);
 venueRoutes.get('/my/venues', getMyVenues);
-venueRoutes.patch('/:venueId', updateVenue);
+venueRoutes.post('/', createVenue);
 venueRoutes.post('/offers', createOffer);
 venueRoutes.get('/offers/match/:matchId', getOffersForMatch);
 venueRoutes.post('/redemptions', generateRedemption);
 venueRoutes.post('/redemptions/redeem', redeemOffer);
+
+// Param routes LAST
+venueRoutes.get('/:venueId', getVenue);
+venueRoutes.patch('/:venueId', updateVenue);
 venueRoutes.get('/:venueId/analytics', getAnalytics);

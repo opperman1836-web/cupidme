@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
+import { validate } from '../middleware/validate.middleware';
+import { createProfileSchema, addPhotoSchema, setInterestsSchema } from '../validators/user.validator';
 import {
   getProfile, createProfile, updateProfile,
   addPhoto, deletePhoto, setInterests,
@@ -12,10 +14,10 @@ userRoutes.use(requireAuth);
 
 userRoutes.get('/me', getProfile);
 userRoutes.get('/profile/:userId', getProfile);
-userRoutes.post('/profile', createProfile);
+userRoutes.post('/profile', validate(createProfileSchema), createProfile);
 userRoutes.patch('/profile', updateProfile);
-userRoutes.post('/photos', addPhoto);
+userRoutes.post('/photos', validate(addPhotoSchema), addPhoto);
 userRoutes.delete('/photos/:photoId', deletePhoto);
-userRoutes.put('/interests', setInterests);
+userRoutes.put('/interests', validate(setInterestsSchema), setInterests);
 userRoutes.get('/discover', discover);
 userRoutes.post('/verify', submitVerification);

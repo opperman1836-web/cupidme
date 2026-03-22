@@ -4,7 +4,7 @@ import { userService } from '../services/user.service';
 
 export async function getProfile(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const userId = req.params.userId || req.userId!;
+    const userId = (req.params.userId as string) || req.userId!;
     const profile = await userService.getProfile(userId);
     res.json({ success: true, data: profile });
   } catch (err) { next(err); }
@@ -34,7 +34,7 @@ export async function addPhoto(req: AuthRequest, res: Response, next: NextFuncti
 
 export async function deletePhoto(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await userService.deletePhoto(req.userId!, req.params.photoId);
+    await userService.deletePhoto(req.userId!, req.params.photoId as string);
     res.json({ success: true, message: 'Photo deleted' });
   } catch (err) { next(err); }
 }

@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { env } from './config/env';
 import { errorHandler } from './middleware/error.middleware';
 import { authRoutes } from './routes/auth.routes';
@@ -14,8 +13,6 @@ import { paymentRoutes } from './routes/payment.routes';
 import { venueRoutes } from './routes/venue.routes';
 import { adminRoutes } from './routes/admin.routes';
 import { webhookRoutes } from './routes/webhook.routes';
-
-dotenv.config({ path: '../../.env' });
 
 const app = express();
 

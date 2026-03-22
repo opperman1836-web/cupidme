@@ -18,7 +18,7 @@ export class RelationshipService {
       .eq('match_id', matchId)
       .single();
 
-    if (error) throw new AppError(error.message);
+    if (error || !data) return null;
     return data;
   }
 

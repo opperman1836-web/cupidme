@@ -112,9 +112,8 @@ export class UserService {
 
     let query = supabaseAdmin
       .from('profiles')
-      .select('*, user_photos(url, position, is_primary), users!inner(is_active, is_verified)')
+      .select('*, user_photos(url, position, is_primary)')
       .eq('profile_complete', true)
-      .eq('users.is_active', true)
       .not('user_id', 'in', `(${excludedIds.join(',')})`)
       .range((page - 1) * limit, page * limit - 1);
 

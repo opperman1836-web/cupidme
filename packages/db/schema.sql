@@ -593,7 +593,20 @@ INSERT INTO products (name, type, amount_zar, description) VALUES
 ('Venue Pro', 'subscription', 99900, 'Venue monthly: featured placement, full analytics, priority support');
 
 -- ============================================================
--- 13. Updated_at trigger helper
+-- 13. RPC Functions
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION increment_redemption_count(p_offer_id UUID)
+RETURNS void AS $$
+BEGIN
+  UPDATE venue_offers
+  SET current_redemptions = current_redemptions + 1
+  WHERE id = p_offer_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================
+-- 14. Updated_at trigger helper
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at()

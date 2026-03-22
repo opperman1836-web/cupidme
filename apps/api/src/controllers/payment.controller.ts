@@ -26,11 +26,19 @@ export async function getSubscription(req: AuthRequest, res: Response, next: Nex
   } catch (err) { next(err); }
 }
 
-export async function handleStripeWebhook(req: Request, res: Response, next: NextFunction) {
+export async function handleStripeWebhook(req: Request, res: Response, _next: NextFunction) {
+  const sig = req.headers['stripe-signature'] as string;
+
+  if (!sig) {
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
+  }
+
   try {
-    const sig = req.headers['stripe-signature'] as string;
     const event = stripe.webhooks.constructEvent(req.body, sig, env.STRIPE_WEBHOOK_SECRET);
     await paymentService.handleWebhook(event);
     res.json({ received: true });
-  } catch (err) { next(err); }
+  } catch (err: any) {
+    console.error('Webhook signature verification failed:', err.message);
+    res.status(400).json({ error: 'Webhook signature verification failed' });
+  }
 }
