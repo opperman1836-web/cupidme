@@ -1,93 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'leads.json');
+const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN || 'nsa-admin-2024';
 
-interface Lead {
-  id: string;
-  fullName: string;
-  phone: string;
-  location: string;
-  courseInterest: string;
-  createdAt: string;
-  status: 'new' | 'contacted' | 'enrolled' | 'lost';
-}
-
-async function getLeads(): Promise<Lead[]> {
-  try {
-    const data = await fs.readFile(DATA_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
-}
-
-async function saveLeads(leads: Lead[]): Promise<void> {
-  const dir = path.dirname(DATA_FILE);
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(leads, null, 2));
-}
-
-// GET - Fetch all leads (admin)
+// GET - Fetch all leads (admin only)
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== 'Bearer nsa-admin-2024') {
+  if (authHeader !== `Bearer ${ADMIN_TOKEN}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const leads = await getLeads();
-  return NextResponse.json({ leads, total: leads.length });
+  try {
+    const supabase = createAdminSupabase();
+    const { data, error, count } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ leads: data, total: count });
+  } catch (err) {
+    console.error('Failed to fetch leads:', err);
+    return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
+  }
 }
 
-// POST - Create new lead
+// POST - Create new lead (public)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { fullName, phone, location, courseInterest } = body;
 
+    // Validation
     if (!fullName || !phone || !location || !courseInterest) {
-      return NextResponse.json(
-        { error: 'All fields are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
 
     if (fullName.length > 200 || phone.length > 30 || location.length > 200 || courseInterest.length > 200) {
-      return NextResponse.json(
-        { error: 'Input too long' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Input too long' }, { status: 400 });
     }
 
-    const leads = await getLeads();
+    const supabase = createAdminSupabase();
+    const { data, error } = await supabase
+      .from('leads')
+      .insert({
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        location: location.trim(),
+        course_interest: courseInterest.trim(),
+        status: 'new',
+      })
+      .select('id')
+      .single();
 
-    const newLead: Lead = {
-      id: crypto.randomUUID(),
-      fullName: fullName.trim(),
-      phone: phone.trim(),
-      location: location.trim(),
-      courseInterest: courseInterest.trim(),
-      createdAt: new Date().toISOString(),
-      status: 'new',
-    };
+    if (error) throw error;
 
-    leads.push(newLead);
-    await saveLeads(leads);
-
-    return NextResponse.json({ success: true, id: newLead.id }, { status: 201 });
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    );
+    return NextResponse.json({ success: true, id: data.id }, { status: 201 });
+  } catch (err) {
+    console.error('Failed to create lead:', err);
+    return NextResponse.json({ error: 'Failed to submit application' }, { status: 500 });
   }
 }
 
-// PATCH - Update lead status (admin)
+// PATCH - Update lead status (admin only)
 export async function PATCH(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== 'Bearer nsa-admin-2024') {
+  if (authHeader !== `Bearer ${ADMIN_TOKEN}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -104,17 +83,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const leads = await getLeads();
-    const leadIndex = leads.findIndex((l) => l.id === id);
-    if (leadIndex === -1) {
-      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-    }
+    const supabase = createAdminSupabase();
+    const { error } = await supabase
+      .from('leads')
+      .update({ status })
+      .eq('id', id);
 
-    leads[leadIndex].status = status;
-    await saveLeads(leads);
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  } catch (err) {
+    console.error('Failed to update lead:', err);
+    return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 });
   }
 }

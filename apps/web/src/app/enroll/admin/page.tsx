@@ -5,11 +5,11 @@ import { RefreshCw, Phone, MapPin, Clock, Users, CheckCircle, XCircle, MessageCi
 
 interface Lead {
   id: string;
-  fullName: string;
+  full_name: string;
   phone: string;
   location: string;
-  courseInterest: string;
-  createdAt: string;
+  course_interest: string;
+  created_at: string;
   status: 'new' | 'contacted' | 'enrolled' | 'lost';
 }
 
@@ -93,7 +93,7 @@ export default function AdminPage() {
 
   const filteredLeads = filter === 'all' ? leads : leads.filter((l) => l.status === filter);
   const sortedLeads = [...filteredLeads].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
   const stats = {
@@ -187,7 +187,7 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-gray-100">
                   {sortedLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{lead.fullName}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{lead.full_name}</td>
                       <td className="px-4 py-3">
                         <a
                           href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
@@ -205,9 +205,9 @@ export default function AdminPage() {
                           {lead.location}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{lead.courseInterest}</td>
+                      <td className="px-4 py-3 text-gray-600 hidden lg:table-cell">{lead.course_interest}</td>
                       <td className="px-4 py-3 text-gray-500 text-sm">
-                        {new Date(lead.createdAt).toLocaleDateString('en-ZA', {
+                        {new Date(lead.created_at).toLocaleDateString('en-ZA', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
