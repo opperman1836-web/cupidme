@@ -82,15 +82,17 @@ export class PaymentService {
     }
 
     // Record the event BEFORE processing to prevent race conditions
-    await supabaseAdmin.from('webhook_events').insert({
+    const { error: insertError } = await supabaseAdmin.from('webhook_events').insert({
       stripe_event_id: event.id,
       event_type: event.type,
       processed_at: new Date().toISOString(),
-    }).catch(() => {
+    });
+
+    if (insertError) {
       // If insert fails due to unique constraint, another process is handling it
       logger.warn(`Webhook event ${event.id} insert conflict, skipping`);
       return;
-    });
+    }
 
     switch (event.type) {
       case 'checkout.session.completed': {

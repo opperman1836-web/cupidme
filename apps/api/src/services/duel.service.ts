@@ -70,10 +70,11 @@ export class DuelService {
 
     if (error) throw new AppError(error.message);
 
+    // Non-critical: notify opponent
     await supabaseAdmin.from('notifications').insert({
       user_id: opponentId, type: 'system', title: 'Duel Challenge!',
       body: 'Someone challenged you to a Cupid Duel!', data: { duel_id: duel.id },
-    }).catch(() => {}); // non-critical
+    }); // error ignored — non-critical
 
     return duel;
   }
@@ -269,10 +270,11 @@ export class DuelService {
       }
 
       if (duel.match_id) {
+        // Non-critical: record relationship event
         await supabaseAdmin.from('relationship_events').insert({
           match_id: duel.match_id, event_type: 'challenge_passed',
           score_deltas: { trust: 5, chemistry: 10, depth: 5 },
-        }).catch(() => {});
+        }); // error ignored — non-critical
       }
 
       return { status: 'completed', compatibility_score: compatibility.score, ai_insight: compatibility.insight };

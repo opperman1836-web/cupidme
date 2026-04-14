@@ -10,4 +10,5 @@ dist/
 coverage/
 *.tsbuildinfo
 deploy.bat
+vercel.json
 .claude/

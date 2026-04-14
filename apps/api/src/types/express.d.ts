@@ -1,13 +1,3 @@
-import { UserRole } from './index';
-
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: string;
-      userRole?: string;
-      accessToken?: string;
-    }
-  }
-}
-
+// This file intentionally left minimal.
+// Express type augmentation is handled in modules.d.ts
 export {};

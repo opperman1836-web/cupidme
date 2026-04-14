@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -51,8 +51,8 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('short'));
 
-// Health check
-app.get('/api/health', (_req, res) => {
+// Health check (both paths for compatibility)
+const healthResponse = (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     version: '1.0.0',
@@ -60,7 +60,9 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
   });
-});
+};
+app.get('/health', healthResponse);
+app.get('/api/health', healthResponse);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -87,9 +89,9 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error.message);
 });
 
-const PORT = env.API_PORT || 4000; // v2 reload trigger
-app.listen(PORT, () => {
-  console.log(`CupidMe API running on port ${PORT}`);
+const PORT = env.API_PORT || 4000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`CupidMe API running on port ${PORT} (${env.NODE_ENV})`);
 });
 
 export default app;
