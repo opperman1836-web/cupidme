@@ -16,14 +16,6 @@
     "build:api": "npm run build --workspace=@cupidme/api",
     "build:web": "npm run build --workspace=@cupidme/web"
   },
-  "dependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.7",
-    "@types/morgan": "^1.9.9",
-    "@types/node": "^22.0.0",
-    "@types/uuid": "^10.0.0"
-  },
   "devDependencies": {
     "turbo": "^2.3.0",
     "typescript": "^5.4.0"
