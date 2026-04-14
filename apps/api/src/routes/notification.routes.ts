@@ -1,4 +1,4 @@
-const Router = require('express').Router;
+import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { getNotifications, markRead, markAllRead } from '../controllers/notification.controller';
 

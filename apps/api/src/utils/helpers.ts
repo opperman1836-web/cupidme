@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+import { v4 as uuidv4 } from 'uuid';
 
 export function generateQRCode(): string {
   return `CUPID-${uuidv4().split('-').slice(0, 2).join('')}`.toUpperCase();

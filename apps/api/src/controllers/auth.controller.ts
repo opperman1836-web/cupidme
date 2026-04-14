@@ -1,7 +1,8 @@
 import { authService } from '../services/auth.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { Request, Response, NextFunction } from 'express';
 
-export async function register(req: any, res: any, next: any) {
+export async function register(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, password, phone } = req.body;
     const result = await authService.register(email, password, phone);
@@ -9,7 +10,7 @@ export async function register(req: any, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function login(req: any, res: any, next: any) {
+export async function login(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
@@ -17,7 +18,7 @@ export async function login(req: any, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function refresh(req: any, res: any, next: any) {
+export async function refresh(req: Request, res: Response, next: NextFunction) {
   try {
     const { refresh_token } = req.body;
     const result = await authService.refreshToken(refresh_token);
@@ -25,7 +26,7 @@ export async function refresh(req: any, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function logout(req: AuthRequest, res: any, next: any) {
+export async function logout(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     await authService.logout(req.userId!);
     res.json({ success: true, message: 'Logged out' });

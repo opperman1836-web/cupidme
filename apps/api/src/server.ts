@@ -1,7 +1,7 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler } from './middleware/error.middleware';
 import { authRoutes } from './routes/auth.routes';
@@ -22,16 +22,15 @@ const app = express();
 // Webhook route needs raw body for Stripe signature verification
 app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
 
-// CORS must come BEFORE helmet to ensure preflight OPTIONS work
+// CORS
 const allowedOrigins = env.CORS_ORIGIN
-  ? env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  ? env.CORS_ORIGIN.split(',').map((o: string) => o.trim())
   : ['http://localhost:3000'];
 
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (mobile apps, server-to-server, health checks)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.some((allowed) => origin === allowed || origin.endsWith('.vercel.app'))) {
+    if (allowedOrigins.some((allowed: string) => origin === allowed || origin.endsWith('.vercel.app'))) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
@@ -42,7 +41,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Helmet with safe defaults that don't break CORS
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginOpenerPolicy: false,
@@ -51,18 +49,13 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('short'));
 
-// Health check (both paths for compatibility)
-const healthResponse = (_req: any, res: any) => {
-  res.json({
-    status: 'ok',
-    version: '1.0.0',
-    environment: env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()),
-  });
-};
-app.get('/health', healthResponse);
-app.get('/api/health', healthResponse);
+// Health check
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', version: '1.0.0', environment: env.NODE_ENV, timestamp: new Date().toISOString() });
+});
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', version: '1.0.0', environment: env.NODE_ENV, timestamp: new Date().toISOString() });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -78,10 +71,8 @@ app.use('/api/invites', inviteRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
-// Error handler
 app.use(errorHandler);
 
-// Prevent server crashes from unhandled promise rejections
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
 });

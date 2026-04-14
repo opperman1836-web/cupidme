@@ -1,4 +1,4 @@
-const Router = require('express').Router;
+import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import {
   createVenue, getVenues, getVenue, getMyVenues, updateVenue,

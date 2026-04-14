@@ -1,4 +1,4 @@
-const Router = require('express').Router;
+import { Router } from 'express';
 import { register, login, refresh, logout } from '../controllers/auth.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 import { rateLimit } from '../middleware/rateLimit.middleware';

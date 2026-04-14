@@ -1,4 +1,4 @@
-const Router = require('express').Router;
+import { Router } from 'express';
 import { handleStripeWebhook } from '../controllers/payment.controller';
 
 export const webhookRoutes = Router();

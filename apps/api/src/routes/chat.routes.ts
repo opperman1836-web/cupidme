@@ -1,4 +1,4 @@
-const Router = require('express').Router;
+import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { rateLimit } from '../middleware/rateLimit.middleware';
 import { startChat, sendMessage, getMessages, extendChat } from '../controllers/chat.controller';

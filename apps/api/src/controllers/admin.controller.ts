@@ -1,8 +1,9 @@
 import { AuthRequest } from '../middleware/auth.middleware';
+import { Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../config/supabase';
 import { AppError } from '../utils/errors';
 
-export async function getUsers(req: AuthRequest, res: any, next: any) {
+export async function getUsers(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -18,7 +19,7 @@ export async function getUsers(req: AuthRequest, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function toggleUserActive(req: AuthRequest, res: any, next: any) {
+export async function toggleUserActive(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { userId } = req.params;
     const { is_active } = req.body;
@@ -39,7 +40,7 @@ export async function toggleUserActive(req: AuthRequest, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function getReports(req: AuthRequest, res: any, next: any) {
+export async function getReports(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const status = req.query.status as string || 'open';
 
@@ -54,7 +55,7 @@ export async function getReports(req: AuthRequest, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function resolveReport(req: AuthRequest, res: any, next: any) {
+export async function resolveReport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { reportId } = req.params;
     const { status, resolution_note } = req.body;
@@ -72,7 +73,7 @@ export async function resolveReport(req: AuthRequest, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function getPendingVenues(req: AuthRequest, res: any, next: any) {
+export async function getPendingVenues(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { data, error } = await supabaseAdmin
       .from('venues')
@@ -85,7 +86,7 @@ export async function getPendingVenues(req: AuthRequest, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function approveVenue(req: AuthRequest, res: any, next: any) {
+export async function approveVenue(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { venueId } = req.params;
     const { status } = req.body; // 'approved' or 'rejected'
@@ -110,7 +111,7 @@ export async function approveVenue(req: AuthRequest, res: any, next: any) {
   } catch (err) { next(err); }
 }
 
-export async function approveVerification(req: AuthRequest, res: any, next: any) {
+export async function approveVerification(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { verificationId } = req.params;
     const { status } = req.body;
@@ -137,7 +138,7 @@ export async function approveVerification(req: AuthRequest, res: any, next: any)
   } catch (err) { next(err); }
 }
 
-export async function getPaymentsOverview(req: AuthRequest, res: any, next: any) {
+export async function getPaymentsOverview(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { data: recentPayments } = await supabaseAdmin
       .from('payments')
