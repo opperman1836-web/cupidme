@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@layer base {
+  body {
+    @apply bg-dark-50 text-dark-900 antialiased;
+  }
+
+  .dark body {
+    @apply bg-dark-950 text-dark-100;
+  }
+
+  ::selection {
+    @apply bg-cupid-200 text-cupid-900;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-400;
+  }
+}
+
+@layer components {
+  /* Glassmorphism cards */
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl;
+  }
+  .glass-dark {
+    @apply bg-dark-900/70 backdrop-blur-xl border border-white/10 shadow-xl;
+  }
+  .glass-cupid {
+    @apply bg-cupid-500/10 backdrop-blur-xl border border-cupid-200/30;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cupid-500 via-cupid-400 to-cupid-600;
+  }
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500;
+  }
+
+  /* Premium button styles */
+  .btn-premium {
+    @apply relative overflow-hidden bg-gradient-to-r from-cupid-500 to-cupid-600 text-white font-bold rounded-2xl
+    shadow-lg shadow-cupid-500/25 hover:shadow-xl hover:shadow-cupid-500/30
+    transition-all duration-300 hover:scale-[1.02] active:scale-[0.98];
+  }
+  .btn-premium::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0;
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+  }
+  .btn-premium:hover::before {
+    transform: translateX(100%);
+  }
+
+  /* Card hover effects */
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+  .card-glow:hover {
+    box-shadow: 0 0 30px rgba(244, 63, 94, 0.15);
+  }
+
+  /* Animated gradient background */
+  .bg-animated-gradient {
+    background: linear-gradient(-45deg, #FFF1F2, #FFE4E6, #F8FAFC, #FECDD3);
+    background-size: 400% 400%;
+    animation: gradient 15s ease infinite;
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    @apply animate-shimmer bg-gradient-to-r from-dark-100 via-dark-50 to-dark-100 bg-[length:200%_100%];
+  }
+
+  /* Floating animation */
+  .floating {
+    @apply animate-float;
+  }
+  .floating-delayed {
+    @apply animate-float-delayed;
+  }
+
+  /* Section reveal animation */
+  .reveal {
+    @apply opacity-0 translate-y-8 transition-all duration-700;
+  }
+  .reveal.visible {
+    @apply opacity-100 translate-y-0;
+  }
+
+  /* Interactive map dot */
+  .map-dot {
+    @apply w-2 h-2 rounded-full bg-cupid-500 relative;
+  }
+  .map-dot::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-cupid-500 animate-ping;
+  }
+
+  /* Premium badge */
+  .badge-premium {
+    @apply bg-gradient-to-r from-amber-400 to-amber-500 text-amber-900 font-bold text-xs px-2.5 py-1 rounded-full;
+  }
+
+  /* Stat counter */
+  .stat-number {
+    @apply text-4xl md:text-5xl font-black text-gradient animate-count-up;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Text balancing */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Mask gradient for scroll areas */
+  .mask-gradient-b {
+    mask-image: linear-gradient(to bottom, black 80%, transparent);
+  }
+}
+
+/* Animation keyframe for gradient */
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
