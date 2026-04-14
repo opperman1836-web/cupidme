@@ -1,24 +1,27 @@
-'use client';
+import React from "react";
 
-import { cn } from '@/lib/utils';
-
-interface BadgeProps {
-  children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: "default" | "success" | "error" | "warning";
 }
 
-const variants = {
-  default: 'bg-dark-100 text-dark-700',
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-yellow-100 text-yellow-700',
-  danger: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
-};
+export const Badge: React.FC<BadgeProps> = ({
+  children,
+  className = "",
+  variant = "default",
+  ...props
+}) => {
+  const base = "inline-block px-2 py-1 rounded text-xs font-semibold";
 
-export function Badge({ children, variant = 'default' }: BadgeProps) {
+  const variants: Record<string, string> = {
+    default: "bg-gray-200 text-gray-800",
+    success: "bg-green-500 text-white",
+    error: "bg-red-500 text-white",
+    warning: "bg-yellow-400 text-black",
+  };
+
   return (
-    <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', variants[variant])}>
+    <span className={`${base} ${variants[variant]} ${className}`} {...props}>
       {children}
     </span>
   );
-}
+};
