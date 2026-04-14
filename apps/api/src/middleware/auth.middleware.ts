@@ -1,17 +1,26 @@
-import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../config/supabase';
 import { AppError } from '../utils/errors';
 
-export interface AuthRequest extends Request {
+export interface AuthRequest {
   userId?: string;
   userRole?: string;
   accessToken?: string;
+  body: any;
+  params: any;
+  query: any;
+  headers: any;
+  ip?: string;
+  method?: string;
+  path?: string;
+  url?: string;
+  get?(name: string): string | undefined;
+  [key: string]: any;
 }
 
 export async function requireAuth(
   req: AuthRequest,
-  _res: Response,
-  next: NextFunction
+  _res: any,
+  next: any
 ) {
   try {
     const header = req.headers.authorization;

@@ -1,15 +1,14 @@
-import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { venueService } from '../services/venue.service';
 
-export async function createVenue(req: AuthRequest, res: Response, next: NextFunction) {
+export async function createVenue(req: AuthRequest, res: any, next: any) {
   try {
     const venue = await venueService.createVenue(req.userId!, req.body);
     res.status(201).json({ success: true, data: venue });
   } catch (err) { next(err); }
 }
 
-export async function getVenues(req: AuthRequest, res: Response, next: NextFunction) {
+export async function getVenues(req: AuthRequest, res: any, next: any) {
   try {
     const { city, category, latitude, longitude, radius_km, sort_by } = req.query;
     const venues = await venueService.getVenues({
@@ -24,42 +23,42 @@ export async function getVenues(req: AuthRequest, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
-export async function getVenue(req: AuthRequest, res: Response, next: NextFunction) {
+export async function getVenue(req: AuthRequest, res: any, next: any) {
   try {
     const venue = await venueService.getVenue(req.params.venueId);
     res.json({ success: true, data: venue });
   } catch (err) { next(err); }
 }
 
-export async function getMyVenues(req: AuthRequest, res: Response, next: NextFunction) {
+export async function getMyVenues(req: AuthRequest, res: any, next: any) {
   try {
     const venues = await venueService.getMyVenues(req.userId!);
     res.json({ success: true, data: venues });
   } catch (err) { next(err); }
 }
 
-export async function updateVenue(req: AuthRequest, res: Response, next: NextFunction) {
+export async function updateVenue(req: AuthRequest, res: any, next: any) {
   try {
     const venue = await venueService.updateVenue(req.params.venueId, req.userId!, req.body);
     res.json({ success: true, data: venue });
   } catch (err) { next(err); }
 }
 
-export async function createOffer(req: AuthRequest, res: Response, next: NextFunction) {
+export async function createOffer(req: AuthRequest, res: any, next: any) {
   try {
     const offer = await venueService.createOffer(req.userId!, req.body);
     res.status(201).json({ success: true, data: offer });
   } catch (err) { next(err); }
 }
 
-export async function getOffersForMatch(req: AuthRequest, res: Response, next: NextFunction) {
+export async function getOffersForMatch(req: AuthRequest, res: any, next: any) {
   try {
     const offers = await venueService.getOffersForMatch(req.params.matchId, req.userId!);
     res.json({ success: true, data: offers });
   } catch (err) { next(err); }
 }
 
-export async function generateRedemption(req: AuthRequest, res: Response, next: NextFunction) {
+export async function generateRedemption(req: AuthRequest, res: any, next: any) {
   try {
     const redemption = await venueService.generateRedemption(
       req.body.offer_id, req.body.match_id, req.userId!
@@ -68,14 +67,14 @@ export async function generateRedemption(req: AuthRequest, res: Response, next: 
   } catch (err) { next(err); }
 }
 
-export async function redeemOffer(req: AuthRequest, res: Response, next: NextFunction) {
+export async function redeemOffer(req: AuthRequest, res: any, next: any) {
   try {
     const result = await venueService.redeemOffer(req.body.qr_code, req.userId!);
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
 
-export async function getAnalytics(req: AuthRequest, res: Response, next: NextFunction) {
+export async function getAnalytics(req: AuthRequest, res: any, next: any) {
   try {
     const analytics = await venueService.getVenueAnalytics(req.params.venueId, req.userId!);
     res.json({ success: true, data: analytics });

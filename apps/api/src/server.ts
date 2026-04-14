@@ -1,7 +1,7 @@
-import express, { Request, Response } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
 import { env } from './config/env';
 import { errorHandler } from './middleware/error.middleware';
 import { authRoutes } from './routes/auth.routes';
@@ -52,7 +52,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(morgan('short'));
 
 // Health check (both paths for compatibility)
-const healthResponse = (_req: Request, res: Response) => {
+const healthResponse = (_req: any, res: any) => {
   res.json({
     status: 'ok',
     version: '1.0.0',

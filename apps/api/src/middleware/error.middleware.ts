@@ -1,11 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/errors';
 
 export function errorHandler(
   err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction
+  _req: any,
+  res: any,
+  _next: any
 ) {
   // Prevent double-send
   if (res.headersSent) return;

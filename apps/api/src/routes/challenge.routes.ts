@@ -1,4 +1,4 @@
-import { Router } from 'express';
+const Router = require('express').Router;
 import { requireAuth } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { submitChallengeSchema } from '../validators/challenge.validator';
