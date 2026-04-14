@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "npm install --include=dev && tsc",
+    "build": "tsc",
     "start": "node dist/server.js",
     "lint": "tsc --noEmit"
   },

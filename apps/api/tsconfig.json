@@ -17,6 +17,10 @@
     "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "typeRoots": [
+      "./node_modules/@types",
+      "../../node_modules/@types"
+    ],
     "paths": {
       "@cupidme/types": ["../../packages/types/src"]
     }

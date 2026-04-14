@@ -1,1 +1,1 @@
-// intentionally empty
+// This file intentionally left empty — types come from @types/express
