@@ -16,18 +16,58 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...fetchOptions,
-    headers,
-  });
+  const url = `${API_URL}${path}`;
 
-  const data = await res.json();
+  // Retry logic for cold-start (Render free tier takes ~50s to wake)
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), attempt === 0 ? 30000 : 60000);
 
-  if (!res.ok) {
-    throw new Error(data.error || 'API request failed');
+      const res = await fetch(url, {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      // Try to parse JSON
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || data.message || `Request failed (${res.status})`);
+      }
+
+      return data;
+    } catch (err: any) {
+      lastError = err;
+
+      // If aborted (timeout) or network error, retry once
+      if (attempt === 0 && (err.name === 'AbortError' || err.message === 'Failed to fetch')) {
+        console.warn(`API request to ${path} failed, retrying... (server may be waking up)`);
+        continue;
+      }
+
+      // Better error messages for common cases
+      if (err.name === 'AbortError') {
+        throw new Error('Server is starting up. Please try again in a moment.');
+      }
+      if (err.message === 'Failed to fetch') {
+        throw new Error('Cannot reach the server. Please check your connection and try again.');
+      }
+
+      throw err;
+    }
   }
 
-  return data;
+  throw lastError || new Error('Request failed');
 }
 
 export const api = {

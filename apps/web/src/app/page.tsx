@@ -216,86 +216,103 @@ export default function LandingPage() {
         <FloatingHearts />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 text-center">
-          {/* Badge */}
+          {/* Badge with social proof */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
             className="inline-flex items-center gap-2 glass-cupid rounded-full px-5 py-2 mb-8"
           >
-            <Sparkles className="w-4 h-4 text-cupid-500" />
-            <span className="text-sm font-semibold text-cupid-700">The Dating Revolution Starts Here</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-sm font-semibold text-cupid-700">2,847 people joined this week</span>
           </motion.div>
 
-          {/* Main Headline */}
+          {/* Main Headline — emotional + curiosity */}
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
             className="text-5xl sm:text-6xl md:text-8xl font-black text-dark-900 leading-[0.95] tracking-tight text-balance"
           >
-            Where Love Is
+            Stop Swiping.
             <br />
             <span className="text-gradient bg-gradient-to-r from-cupid-500 via-cupid-400 to-cupid-600 bg-[length:200%_100%] animate-gradient">
-              Earned
+              Start Earning Love.
             </span>
           </motion.h1>
 
-          {/* Subheadline */}
+          {/* Subheadline — benefit-driven + curiosity gap */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.6 }}
             className="mt-8 text-lg sm:text-xl text-dark-500 max-w-2xl mx-auto leading-relaxed"
           >
-            No mindless swiping. Prove you care through AI-powered challenges,
-            build real connections, and unlock sponsored dates at amazing venues.
+            Complete fun AI challenges with your match. Prove you&apos;re serious.
+            <br className="hidden sm:block" />
+            <strong className="text-dark-700">Unlock free dates at real restaurants and venues.</strong>
           </motion.p>
 
-          {/* Dual CTA */}
+          {/* Primary CTA — single, focused, action-driven */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.6 }}
-            className="mt-12 flex flex-col sm:flex-row gap-4 justify-center"
+            className="mt-10 flex flex-col items-center gap-4"
           >
             <Link
               href="/register"
-              className="group btn-premium px-8 py-4 text-lg rounded-2xl inline-flex items-center justify-center gap-2"
+              className="group btn-premium px-10 py-5 text-lg rounded-2xl inline-flex items-center justify-center gap-3 shadow-2xl shadow-cupid-500/25 hover:shadow-cupid-500/40 transition-all"
             >
-              <Heart className="w-5 h-5 fill-white" />
-              Find Love
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <Sparkles className="w-5 h-5" />
+              Take Your First Challenge — Free
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link
-              href="/register?role=venue"
-              className="group px-8 py-4 text-lg font-bold rounded-2xl bg-dark-900 text-white hover:bg-dark-800 transition-all duration-300 shadow-lg hover:shadow-xl inline-flex items-center justify-center gap-2"
-            >
-              <Store className="w-5 h-5" />
-              Promote Your Venue
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            <span className="text-sm text-dark-400 flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              Free forever. No credit card needed.
+            </span>
           </motion.div>
 
-          {/* Trust indicators */}
+          {/* Trust indicators + social proof */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 0.8 }}
-            className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-dark-400"
+            className="mt-10 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-dark-400"
           >
             <span className="flex items-center gap-1.5">
               <Shield className="w-4 h-4 text-emerald-500" />
               AI-Verified Profiles
             </span>
             <span className="flex items-center gap-1.5">
-              <Globe className="w-4 h-4 text-blue-500" />
-              Active Worldwide
+              <Trophy className="w-4 h-4 text-amber-500" />
+              850+ Venue Partners
             </span>
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-cupid-500" />
-              Free to Start
+              <Heart className="w-4 h-4 text-cupid-500 fill-cupid-500" />
+              12,000+ Matches Made
             </span>
+          </motion.div>
+
+          {/* Venue CTA — secondary, below fold */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 0.6 }}
+            className="mt-6"
+          >
+            <Link
+              href="/register?role=venue"
+              className="text-sm font-medium text-dark-500 hover:text-cupid-500 transition-colors inline-flex items-center gap-1"
+            >
+              <Store className="w-4 h-4" />
+              Are you a venue owner? Partner with us
+              <ChevronRight className="w-3 h-3" />
+            </Link>
           </motion.div>
 
           {/* Scroll indicator */}
@@ -434,10 +451,11 @@ export default function LandingPage() {
 
               <Link
                 href="/register"
-                className="inline-flex items-center gap-2 btn-premium px-6 py-3 mt-10 rounded-xl text-sm"
+                className="inline-flex items-center gap-2 btn-premium px-6 py-3.5 mt-10 rounded-xl text-sm shadow-lg shadow-cupid-500/20"
               >
-                Start Your First Challenge
-                <ChevronRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
+                Try a Challenge — It&apos;s Free
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
