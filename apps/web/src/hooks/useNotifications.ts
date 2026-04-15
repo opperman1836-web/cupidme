@@ -25,7 +25,7 @@ export function useNotifications() {
   const fetchNotifications = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await api.get<any>('/api/notifications', token);
+      const res = await api.get<any>('/api/notifications', token!);
       const data = res.data || [];
       setNotifications(data);
       setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
@@ -67,7 +67,7 @@ export function useNotifications() {
   const markRead = useCallback(async (id: string) => {
     if (!token) return;
     try {
-      await api.post<any>(`/api/notifications/${id}/read`, {}, token);
+      await api.post<any>(`/api/notifications/${id}/read`, {}, token!);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
@@ -78,7 +78,7 @@ export function useNotifications() {
   const markAllRead = useCallback(async () => {
     if (!token) return;
     try {
-      await api.post<any>('/api/notifications/read-all', {}, token);
+      await api.post<any>('/api/notifications/read-all', {}, token!);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch { /* ignore */ }

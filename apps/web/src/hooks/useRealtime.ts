@@ -12,23 +12,24 @@ export function useRealtimeMessages(chatRoomId: string | null) {
   useEffect(() => {
     if (!chatRoomId) return;
 
+    const roomId = chatRoomId; // narrow to string for closure
     const supabase = createClient();
     retryCount.current = 0;
 
     function subscribe() {
       const channel = supabase
-        .channel(`chat:${chatRoomId}`)
+        .channel(`chat:${roomId}`)
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
             table: 'messages',
-            filter: `chat_room_id=eq.${chatRoomId}`,
+            filter: `chat_room_id=eq.${roomId}`,
           },
           (payload) => {
             retryCount.current = 0; // Reset on successful message
-            addMessage(chatRoomId, payload.new as any);
+            addMessage(roomId, payload.new as any);
           }
         )
         .subscribe((status) => {

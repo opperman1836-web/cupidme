@@ -45,7 +45,7 @@ export function useAuth() {
   const logout = useCallback(async () => {
     if (accessToken) {
       try {
-        await api.post('/api/auth/logout', {}, accessToken);
+        await api.post('/api/auth/logout', {}, accessToken!);
       } catch { /* ignore */ }
     }
     useChatStore.getState().clearAll();
