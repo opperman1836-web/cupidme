@@ -43,10 +43,10 @@ export default function LoginPage() {
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="Email or username"
                 required
                 className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-dark-200 bg-white text-dark-900 placeholder:text-dark-400 focus:border-cupid-500 focus:ring-2 focus:ring-cupid-100 focus:outline-none transition-all"
               />

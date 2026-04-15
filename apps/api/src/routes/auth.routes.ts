@@ -7,7 +7,7 @@ import { registerSchema, loginSchema, refreshSchema } from '../validators/auth.v
 
 export const authRoutes = Router();
 
-authRoutes.post('/register', rateLimit(5, 60000), validate(registerSchema), register);
-authRoutes.post('/login', rateLimit(10, 60000), validate(loginSchema), login);
+authRoutes.post('/register', rateLimit(30, 60000), validate(registerSchema), register);
+authRoutes.post('/login', rateLimit(30, 60000), validate(loginSchema), login);
 authRoutes.post('/refresh', validate(refreshSchema), refresh);
 authRoutes.post('/logout', requireAuth, logout);

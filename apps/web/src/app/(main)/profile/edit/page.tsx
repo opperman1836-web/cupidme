@@ -8,6 +8,7 @@ import {
   MapPin, Calendar, Check, Pen,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -40,8 +41,10 @@ export default function EditProfilePage() {
     gender_preference: 'everyone',
     city: '',
   });
-  const [photoUrl, setPhotoUrl] = useState('');
+  const [photos, setPhotos] = useState<{ url: string; position: number }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const maxPhotos = 10; // Free users: 10, Premium: 30 (checked on save)
 
   // Track onboarding funnel
   useEffect(() => {
@@ -65,7 +68,9 @@ export default function EditProfilePage() {
             gender_preference: res.data.gender_preference || 'everyone',
             city: res.data.city || '',
           });
-          if (res.data.user_photos?.[0]?.url) setPhotoUrl(res.data.user_photos[0].url);
+          if (res.data.user_photos?.length) {
+            setPhotos(res.data.user_photos.map((p: any) => ({ url: p.url, position: p.position })));
+          }
           if (res.data.user_interests?.length) {
             setSelectedInterests(res.data.user_interests.map((i: any) => i.interest_tag));
           }
@@ -83,6 +88,46 @@ export default function EditProfilePage() {
     setSelectedInterests((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length < 8 ? [...prev, tag] : prev
     );
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (photos.length >= maxPhotos) {
+      addToast(`Maximum ${maxPhotos} photos for free accounts. Upgrade for more!`, 'error');
+      return;
+    }
+
+    setUploading(true);
+    const supabase = createClient();
+    const userId = useAuthStore.getState().userId;
+
+    for (let i = 0; i < files.length; i++) {
+      if (photos.length + i >= maxPhotos) break;
+      const file = files[i];
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `${userId}/${Date.now()}-${i}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from('photos')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+
+      if (error) {
+        addToast(`Upload failed: ${error.message}`, 'error');
+        continue;
+      }
+
+      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+      const newPosition = photos.length + i + 1;
+      setPhotos((prev) => [...prev, { url: urlData.publicUrl, position: newPosition }]);
+    }
+
+    setUploading(false);
+    e.target.value = ''; // Reset input
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   const stepIndex = STEPS.indexOf(step);
@@ -109,9 +154,9 @@ export default function EditProfilePage() {
         await api.post('/api/users/profile', form, token!);
       }
 
-      // Save photo URL if provided
-      if (photoUrl && !existingProfile?.user_photos?.length) {
-        await api.post('/api/users/photos', { url: photoUrl, position: 1 }, token!);
+      // Save photos
+      for (const photo of photos) {
+        await api.post('/api/users/photos', { url: photo.url, position: photo.position }, token!);
       }
 
       // Save interests
@@ -125,7 +170,7 @@ export default function EditProfilePage() {
       }
 
       analytics.track('profile_completed', {
-        has_photo: !!photoUrl,
+        has_photo: photos.length > 0,
         has_bio: !!form.bio,
         interests_count: selectedInterests.length,
       });
@@ -243,43 +288,58 @@ export default function EditProfilePage() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <div className="text-center mb-8">
+              <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Camera className="w-8 h-8 text-blue-500" />
                 </div>
-                <h2 className="text-2xl font-black text-dark-900 dark:text-white">Add a photo</h2>
+                <h2 className="text-2xl font-black text-dark-900 dark:text-white">Add your photos</h2>
                 <p className="text-dark-500 text-sm mt-1">Profiles with photos get 10x more matches</p>
               </div>
 
-              <div className="flex justify-center">
-                <div className="w-48 h-48 rounded-3xl border-3 border-dashed border-dark-200 dark:border-dark-700 flex items-center justify-center bg-dark-50 dark:bg-dark-800/50 overflow-hidden relative">
-                  {photoUrl ? (
-                    <>
-                      <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => setPhotoUrl('')}
-                        className="absolute top-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white text-sm hover:bg-black/70"
-                      >
-                        ✕
-                      </button>
-                    </>
-                  ) : (
-                    <div className="text-center p-4">
-                      <Camera className="w-10 h-10 text-dark-300 mx-auto mb-2" />
-                      <p className="text-xs text-dark-400">Paste a photo URL below</p>
-                    </div>
-                  )}
-                </div>
+              {/* Photo grid */}
+              <div className="grid grid-cols-3 gap-3">
+                {photos.map((photo, i) => (
+                  <div key={i} className="aspect-square rounded-2xl overflow-hidden relative group bg-dark-100 dark:bg-dark-800">
+                    <img src={photo.url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                    >
+                      ✕
+                    </button>
+                    {i === 0 && (
+                      <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-cupid-500 text-white px-2 py-0.5 rounded-full font-semibold">
+                        Main
+                      </span>
+                    )}
+                  </div>
+                ))}
+
+                {/* Upload button */}
+                {photos.length < maxPhotos && (
+                  <label className="aspect-square rounded-2xl border-2 border-dashed border-dark-200 dark:border-dark-700 flex flex-col items-center justify-center cursor-pointer hover:border-cupid-400 hover:bg-cupid-50/50 dark:hover:bg-cupid-900/10 transition-all">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                    {uploading ? (
+                      <div className="w-8 h-8 border-3 border-cupid-500 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="w-8 h-8 text-dark-300 mb-1" />
+                        <span className="text-xs text-dark-400 font-medium">Add Photo</span>
+                      </>
+                    )}
+                  </label>
+                )}
               </div>
 
-              <Input
-                label="Photo URL"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="https://example.com/your-photo.jpg"
-              />
               <p className="text-xs text-dark-400 text-center">
-                Tip: Use a clear, recent photo where your face is visible
+                {photos.length}/{maxPhotos} photos — Use clear photos where your face is visible
               </p>
             </motion.div>
           )}

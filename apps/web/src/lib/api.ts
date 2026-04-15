@@ -23,7 +23,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), attempt === 0 ? 30000 : 60000);
+      const timeout = setTimeout(() => controller.abort(), attempt === 0 ? 60000 : 90000);
 
       const res = await fetch(url, {
         ...fetchOptions,
@@ -57,10 +57,10 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
 
       // Better error messages for common cases
       if (err.name === 'AbortError') {
-        throw new Error('Server is starting up. Please try again in a moment.');
+        throw new Error('Server is warming up — this takes about 30 seconds on first use. Please try again.');
       }
       if (err.message === 'Failed to fetch') {
-        throw new Error('Cannot reach the server. Please check your connection and try again.');
+        throw new Error('Connecting to server... Please wait a moment and try again.');
       }
 
       throw err;
