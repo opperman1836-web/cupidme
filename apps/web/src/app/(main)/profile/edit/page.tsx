@@ -109,7 +109,7 @@ export default function EditProfilePage() {
       const path = `${userId}/${Date.now()}-${i}.${ext}`;
 
       const { error } = await supabase.storage
-        .from('photos')
+        .from('photo')
         .upload(path, file, { cacheControl: '3600', upsert: false });
 
       if (error) {
@@ -117,7 +117,7 @@ export default function EditProfilePage() {
         continue;
       }
 
-      const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+      const { data: urlData } = supabase.storage.from('photo').getPublicUrl(path);
       const newPosition = photos.length + i + 1;
       setPhotos((prev) => [...prev, { url: urlData.publicUrl, position: newPosition }]);
     }
