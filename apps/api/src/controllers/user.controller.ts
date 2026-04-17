@@ -73,6 +73,26 @@ export async function deletePhoto(req: AuthRequest, res: Response, next: NextFun
   } catch (err) { next(err); }
 }
 
+/**
+ * PUT /api/users/photos
+ * Replace-all photos. Body: { photos: string[] } (array of public URLs).
+ * Canonical write path for the onboarding save flow.
+ */
+export async function replacePhotos(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { photos } = req.body as { photos: string[] };
+    if (!Array.isArray(photos)) {
+      res.status(400).json({ success: false, error: 'photos must be an array' });
+      return;
+    }
+    const saved = await userService.replacePhotos(req.userId!, photos);
+    res.json({ success: true, data: { photos: saved } });
+  } catch (err) {
+    logger.error('[Photos] Replace failed', { userId: req.userId, error: (err as Error).message });
+    next(err);
+  }
+}
+
 export async function setInterests(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const interests = await userService.setInterests(req.userId!, req.body.interests);

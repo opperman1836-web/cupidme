@@ -8,16 +8,20 @@ import {
   MapPin, Calendar, Check, Pen,
 } from 'lucide-react';
 
-function haptic(pattern: number | number[]) {
-  try { navigator?.vibrate?.(pattern); } catch {}
-}
 import { api } from '@/lib/api';
-import { createAuthenticatedClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToastStore } from '@/components/ui/Toast';
 import { analytics } from '@/lib/analytics';
+
+// Module-level Supabase browser client (session attached automatically via @supabase/ssr)
+const supabase = createClient();
+
+function haptic(pattern: number | number[]) {
+  try { navigator?.vibrate?.(pattern); } catch {}
+}
 
 const INTERESTS = [
   '🎵 Music', '🎬 Movies', '📚 Reading', '✈️ Travel', '🍕 Foodie',
@@ -48,10 +52,12 @@ export default function EditProfilePage() {
     gender_preference: 'everyone',
     city: '',
   });
-  const [photos, setPhotos] = useState<{ url: string; position: number }[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const maxPhotos = 5; // 5 big Tinder-style slots
+  // Flat index-based photo array: photos[0] = slot 1 (main), photos[1] = slot 2, etc.
+  // null = empty slot. Length is always maxPhotos.
+  const [photos, setPhotos] = useState<(string | null)[]>(() => Array(maxPhotos).fill(null));
+  const [uploading, setUploading] = useState<number | null>(null); // slot index currently uploading
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
   // Track onboarding funnel — only fire AFTER the initial load completes
   // (existingProfile starts as null, so we track via a separate "loaded" flag)
@@ -63,30 +69,20 @@ export default function EditProfilePage() {
     }
   }, [profileLoaded, existingProfile, isEditMode]);
 
-  // Load existing profile directly from Supabase (bypasses stale backend)
+  // Load existing profile through backend API — canonical shape, no direct DB access
   useEffect(() => {
     async function load() {
-      const userId = useAuthStore.getState().userId;
-      if (!userId || !token) {
+      if (!token) {
         setProfileLoaded(true);
         return;
       }
 
       try {
-        const { client: supabase } = await createAuthenticatedClient();
-        if (!supabase) {
-          setProfileLoaded(true);
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*, user_photos(*), user_interests(*)')
-          .eq('user_id', userId)
-          .maybeSingle();
+        const res = await api.get<any>('/api/users/me', token);
+        const profile = res.data;
 
         if (profile) {
-          // If profile complete + not in edit mode → redirect to /discover
+          // If profile complete + not in edit mode → skip onboarding
           if (profile.profile_complete && !isEditMode) {
             useAuthStore.getState().setProfileComplete(true);
             router.replace('/discover');
@@ -97,20 +93,27 @@ export default function EditProfilePage() {
           setForm({
             display_name: profile.display_name || '',
             bio: profile.bio || '',
-            date_of_birth: profile.date_of_birth?.split('T')[0] || '',
+            date_of_birth: profile.date_of_birth || '',
             gender: profile.gender || 'male',
             gender_preference: profile.gender_preference || 'everyone',
             city: profile.city || '',
           });
-          if (profile.user_photos?.length) {
-            setPhotos(profile.user_photos.map((p: any) => ({ url: p.url, position: p.position })));
+
+          // photos is already a flat string[] in canonical shape — hydrate into fixed-length slots
+          if (Array.isArray(profile.photos) && profile.photos.length) {
+            const hydrated: (string | null)[] = Array(maxPhotos).fill(null);
+            profile.photos.slice(0, maxPhotos).forEach((url: string, i: number) => {
+              hydrated[i] = url;
+            });
+            setPhotos(hydrated);
           }
-          if (profile.user_interests?.length) {
-            setSelectedInterests(profile.user_interests.map((i: any) => i.interest_tag));
+
+          if (Array.isArray(profile.interests) && profile.interests.length) {
+            setSelectedInterests(profile.interests);
           }
         }
       } catch (err) {
-        console.warn('[Load] No profile yet (new user):', err);
+        // No profile yet — new user. Not an error.
       }
       setProfileLoaded(true);
     }
@@ -129,87 +132,62 @@ export default function EditProfilePage() {
   }
 
   /**
-   * Upload a single photo to a specific slot (1-10).
-   * Bucket: 'photos'  |  Path: {userId}/slot-{N}-{timestamp}.{ext}
-   * If slot already has a photo, it's replaced.
+   * Upload a photo to a specific slot (0-indexed).
+   * Direct to Supabase Storage (`photos` bucket) — gets public URL back.
+   * Storage upload is the ONE exception to the "all-through-backend" rule
+   * because the Supabase Storage SDK handles multipart + session natively.
    */
-  async function uploadPhotoToSlot(slot: number, file: File) {
-    const userId = useAuthStore.getState().userId;
-    console.info('[Upload] Starting upload', { slot, userId, fileName: file.name, fileSize: file.size });
-
-    if (!userId) {
-      addToast('You must be logged in to upload photos.', 'error');
-      return;
-    }
-
+  const handlePhotoUpload = async (file: File, index: number) => {
     if (file.size > 10 * 1024 * 1024) {
       addToast('Image too large (max 10MB)', 'error');
       return;
     }
 
-    setUploading(true);
+    setUploading(index);
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error('Not authenticated');
 
-    // Get authenticated Supabase client (with user session attached for RLS)
-    const { client: supabase, error: authError } = await createAuthenticatedClient();
-    if (authError || !supabase) {
-      console.error('[Upload] Auth client failed:', authError);
-      addToast('Session expired. Please log in again.', 'error');
-      setUploading(false);
-      return;
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const filePath = `${user.id}/photo-${index}-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('photos')
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage.from('photos').getPublicUrl(filePath);
+      const publicUrl = publicUrlData.publicUrl;
+
+      setPhotos((prev) => {
+        const updated = [...prev];
+        updated[index] = publicUrl;
+        return updated;
+      });
+    } catch (err: any) {
+      console.error('[Photo upload] Failed:', err.message);
+      addToast(err.message || 'Photo upload failed', 'error');
+    } finally {
+      setUploading(null);
     }
+  };
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const path = `${userId}/slot-${slot}-${Date.now()}.${ext}`;
-    console.info('[Upload] Uploading to path:', path);
-
-    // Try 'photo' bucket first (production), fall back to 'photos'
-    let bucketName = 'photo';
-    let { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
-
-    if (uploadError) {
-      console.warn('[Upload] "photo" bucket failed, trying "photos":', uploadError.message);
-      bucketName = 'photos';
-      const retry = await supabase.storage
-        .from(bucketName)
-        .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type });
-      uploadError = retry.error;
-    }
-
-    if (uploadError) {
-      console.error('[Upload] Storage error (both buckets):', uploadError);
-      addToast(`Upload failed: ${uploadError.message}`, 'error');
-      setUploading(false);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
-    console.info('[Upload] Got public URL:', publicUrl);
-
-    // Replace or add the photo at this slot
-    setPhotos((prev) => {
-      const withoutSlot = prev.filter((p) => p.position !== slot);
-      return [...withoutSlot, { url: publicUrl, position: slot }].sort((a, b) => a.position - b.position);
-    });
-
-    console.info('[Upload] Photo saved to slot', slot);
-    setUploading(false);
-  }
-
-  function handleSlotUpload(slot: number) {
+  function handleSlotChange(index: number) {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      uploadPhotoToSlot(slot, file);
+      handlePhotoUpload(file, index);
       e.target.value = '';
     };
   }
 
-  function removePhotoAtSlot(slot: number) {
-    console.info('[Upload] Removing photo at slot', slot);
-    setPhotos((prev) => prev.filter((p) => p.position !== slot));
+  function removePhotoAtIndex(index: number) {
+    setPhotos((prev) => {
+      const updated = [...prev];
+      updated[index] = null;
+      return updated;
+    });
   }
 
   const stepIndex = STEPS.indexOf(step);
@@ -232,38 +210,12 @@ export default function EditProfilePage() {
   }
 
   /**
-   * Final onboarding submit.
-   *
-   * CRITICAL: Writes directly to Supabase (bypasses backend API).
-   * This eliminates the "duplicate key" error that the stale backend throws,
-   * because we use supabase .upsert() on user_id.
-   *
-   * Writes in this order:
-   *   1. profiles — upsert on user_id (profile_complete = true)
-   *   2. user_photos — delete then insert (replace-all semantics)
-   *   3. user_interests — delete then insert
-   *   4. Mark store + redirect to /discover
+   * Final onboarding submit — all DB writes go through backend API.
+   * Order: profile → photos → interests → redirect.
    */
   async function handleComplete() {
-    console.info('═══════════════════════════════════════════');
-    console.info('[handleComplete] Starting DIRECT Supabase save flow');
-    console.info('═══════════════════════════════════════════');
-
     if (!token) {
-      console.error('[handleComplete] ABORT — no token');
       addToast('You must be logged in. Please log in again.', 'error');
-      router.push('/login');
-      return;
-    }
-
-    const userId = useAuthStore.getState().userId;
-    console.info('[handleComplete] userId:', userId);
-    console.info('[handleComplete] Form data:', form);
-    console.info('[handleComplete] Photos:', photos);
-    console.info('[handleComplete] Interests:', selectedInterests);
-
-    if (!userId) {
-      addToast('Session error. Please log in again.', 'error');
       router.push('/login');
       return;
     }
@@ -272,94 +224,41 @@ export default function EditProfilePage() {
     try {
       analytics.trackFunnel('profile_completed');
 
-      // Get authenticated Supabase client
-      const { client: supabase, error: authErr } = await createAuthenticatedClient();
-      if (authErr || !supabase) {
-        throw new Error('Could not authenticate with Supabase: ' + (authErr?.message || ''));
-      }
-
-      // ── STEP 1: UPSERT profile (NEVER throws duplicate-key) ──
-      console.info('[handleComplete] Step 1/4: Supabase upsert profiles');
-      const profilePayload = {
-        user_id: userId,
+      // 1. Upsert profile via backend (canonical endpoint — handles duplicate-key safely)
+      await api.post('/api/users/profile', {
         display_name: form.display_name.trim(),
-        bio: form.bio.trim() || null,
+        bio: form.bio.trim() || undefined,
         date_of_birth: form.date_of_birth,
         gender: form.gender,
         gender_preference: form.gender_preference,
         city: form.city.trim(),
-        profile_complete: true,
-        updated_at: new Date().toISOString(),
-      };
-      console.info('[handleComplete] Profile payload:', profilePayload);
+      }, token);
 
-      const { data: profileData, error: profileErr } = await supabase
-        .from('profiles')
-        .upsert(profilePayload, { onConflict: 'user_id' })
-        .select()
-        .single();
+      // 2. Replace-all photos via backend
+      const photoUrls = photos.filter(Boolean) as string[];
+      await api.put('/api/users/photos', { photos: photoUrls }, token);
 
-      if (profileErr) {
-        console.error('[handleComplete] Profile upsert error:', profileErr);
-        throw new Error(`Profile save failed: ${profileErr.message}`);
-      }
-      console.info('[handleComplete] ✓ Profile upserted:', profileData);
-
-      // ── STEP 2: Photos — delete old + insert new (replace-all) ──
-      console.info('[handleComplete] Step 2/4: Saving photos');
-      await supabase.from('user_photos').delete().eq('user_id', userId);
-
-      if (photos.length > 0) {
-        const photoRows = photos.map((p) => ({
-          user_id: userId,
-          url: p.url,
-          position: p.position,
-          is_primary: p.position === 1,
-        }));
-        const { error: photoErr } = await supabase.from('user_photos').insert(photoRows);
-        if (photoErr) {
-          console.error('[handleComplete] Photo save error:', photoErr);
-          // Non-fatal — continue
-        }
-      }
-      console.info('[handleComplete] ✓ Photos saved');
-
-      // ── STEP 3: Interests — delete old + insert new ──
-      console.info('[handleComplete] Step 3/4: Saving interests');
-      await supabase.from('user_interests').delete().eq('user_id', userId);
-
-      if (selectedInterests.length > 0) {
-        const interestRows = selectedInterests.map((tag) => ({
-          user_id: userId,
+      // 3. Replace-all interests via backend
+      await api.put('/api/users/interests', {
+        interests: selectedInterests.map((tag) => ({
           interest_tag: tag,
           category: 'general',
-        }));
-        const { error: interestErr } = await supabase.from('user_interests').insert(interestRows);
-        if (interestErr) {
-          console.error('[handleComplete] Interest save error:', interestErr);
-          // Non-fatal — continue
-        }
-      }
-      console.info('[handleComplete] ✓ Interests saved');
+        })),
+      }, token);
 
-      // ── STEP 4: Mark profile complete + redirect ──
-      console.info('[handleComplete] Step 4/4: Marking complete + redirecting');
+      // 4. Update local state + redirect
       useAuthStore.getState().setProfileComplete(true);
 
       analytics.track('profile_completed', {
-        has_photo: photos.length > 0,
+        has_photo: photoUrls.length > 0,
         has_bio: !!form.bio,
         interests_count: selectedInterests.length,
       });
 
-      addToast('Profile complete! Let\'s find your match 💕', 'success');
-      console.info('[handleComplete] ✓ All done — redirecting to /discover');
-      console.info('═══════════════════════════════════════════');
-
-      // Hard redirect with full page reload so any cached state is cleared
+      addToast("Profile complete! Let's find your match 💕", 'success');
       window.location.href = '/discover';
     } catch (err: any) {
-      console.error('[handleComplete] ✗ FAILED:', err);
+      console.error('[handleComplete] Failed:', err?.message);
       addToast(err?.message || 'Failed to save profile. Please try again.', 'error');
     } finally {
       setLoading(false);
@@ -509,20 +408,17 @@ export default function EditProfilePage() {
               {/* Tinder-style photo grid — 5 BIG slots
                   Layout: 1 large main photo (spans 2 cols x 2 rows) + 4 smaller slots beside/below */}
               <div className="grid grid-cols-3 gap-3 auto-rows-[120px] sm:auto-rows-[140px]">
-                {Array.from({ length: maxPhotos }).map((_, i) => {
-                  const slot = i + 1;
-                  const photo = photos.find((p) => p.position === slot);
-                  const isMain = slot === 1;
+                {photos.map((photoUrl, index) => {
+                  const isMain = index === 0;
+                  const isUploading = uploading === index;
                   // Main photo takes 2x2 grid cells — makes it BIG like Tinder
-                  const gridClass = isMain
-                    ? 'col-span-2 row-span-2'
-                    : 'col-span-1 row-span-1';
+                  const gridClass = isMain ? 'col-span-2 row-span-2' : 'col-span-1 row-span-1';
 
                   return (
                     <label
-                      key={slot}
+                      key={index}
                       className={`${gridClass} rounded-2xl overflow-hidden relative group cursor-pointer transition-all ${
-                        photo
+                        photoUrl
                           ? 'bg-dark-100 dark:bg-dark-800 shadow-lg ring-1 ring-black/5'
                           : 'border-2 border-dashed border-dark-200 dark:border-dark-700 hover:border-cupid-400 hover:bg-cupid-50/50 dark:hover:bg-cupid-900/10 bg-dark-50 dark:bg-dark-900/50'
                       }`}
@@ -530,16 +426,16 @@ export default function EditProfilePage() {
                       <input
                         type="file"
                         accept="image/*"
-                        onChange={handleSlotUpload(slot)}
+                        onChange={handleSlotChange(index)}
                         className="hidden"
-                        disabled={uploading}
+                        disabled={isUploading}
                       />
 
-                      {photo ? (
+                      {photoUrl ? (
                         <>
                           <img
-                            src={photo.url}
-                            alt={`Photo ${slot}`}
+                            src={photoUrl}
+                            alt={`Photo ${index + 1}`}
                             className="w-full h-full object-cover"
                           />
                           {/* Hover overlay — change hint */}
@@ -554,10 +450,10 @@ export default function EditProfilePage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              removePhotoAtSlot(slot);
+                              removePhotoAtIndex(index);
                             }}
                             className={`absolute top-2 right-2 ${isMain ? 'w-9 h-9' : 'w-7 h-7'} bg-black/70 rounded-full flex items-center justify-center text-white font-bold hover:bg-red-500 transition-colors z-10`}
-                            aria-label={`Remove photo ${slot}`}
+                            aria-label={`Remove photo ${index + 1}`}
                           >
                             ✕
                           </button>
@@ -569,7 +465,7 @@ export default function EditProfilePage() {
                         </>
                       ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          {uploading ? (
+                          {isUploading ? (
                             <div className={`${isMain ? 'w-10 h-10 border-4' : 'w-6 h-6 border-[3px]'} border-cupid-500 border-t-transparent rounded-full animate-spin`} />
                           ) : (
                             <>
@@ -589,7 +485,7 @@ export default function EditProfilePage() {
               </div>
 
               <p className="text-xs text-dark-400 text-center mt-4">
-                {photos.length}/{maxPhotos} photos — Tap any slot to upload. Large photo on top is your main.
+                {photos.filter(Boolean).length}/{maxPhotos} photos — Tap any slot to upload. Large photo on top is your main.
               </p>
             </motion.div>
           )}

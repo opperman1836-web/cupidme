@@ -110,11 +110,10 @@ export default function ProfilePage() {
   }
 
   // ── Profile exists + complete: render it ──
-  const primaryPhoto = profile.user_photos?.find((p: any) => p.is_primary) || profile.user_photos?.[0];
-  const photos = profile.user_photos?.sort((a: any, b: any) => a.position - b.position) || [];
-  const age = profile.date_of_birth
-    ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-    : null;
+  // Canonical shape from backend: { photos: string[], interests: string[], age, ... }
+  const photos: string[] = Array.isArray(profile.photos) ? profile.photos : [];
+  const primaryPhotoUrl = photos[0] || null;
+  const age = profile.age ?? null;
 
   return (
     <div className="max-w-lg mx-auto">
@@ -136,8 +135,8 @@ export default function ProfilePage() {
         <Card className="overflow-hidden p-0">
           {/* Cover */}
           <div className="relative h-48 bg-gradient-to-br from-cupid-400 to-cupid-600">
-            {primaryPhoto?.url && (
-              <img src={primaryPhoto.url} alt="" className="w-full h-full object-cover opacity-40" />
+            {primaryPhotoUrl && (
+              <img src={primaryPhotoUrl} alt="" className="w-full h-full object-cover opacity-40" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
           </div>
@@ -146,8 +145,8 @@ export default function ProfilePage() {
             <div className="flex items-end gap-4">
               <div className="relative">
                 <div className="w-28 h-28 rounded-3xl overflow-hidden border-4 border-white dark:border-dark-900 shadow-xl bg-white dark:bg-dark-800">
-                  {primaryPhoto?.url ? (
-                    <img src={primaryPhoto.url} alt={profile.display_name} className="w-full h-full object-cover" />
+                  {primaryPhotoUrl ? (
+                    <img src={primaryPhotoUrl} alt={profile.display_name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-cupid-50 dark:bg-cupid-900/20 flex items-center justify-center">
                       <Heart className="w-10 h-10 text-cupid-300" />
@@ -183,26 +182,26 @@ export default function ProfilePage() {
               <p className="text-dark-600 dark:text-dark-400 mt-5 leading-relaxed">{profile.bio}</p>
             )}
 
-            {/* Interests */}
-            {profile.user_interests?.length > 0 && (
+            {/* Interests — canonical shape: string[] */}
+            {Array.isArray(profile.interests) && profile.interests.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-5">
-                {profile.user_interests.map((interest: any, i: number) => (
+                {profile.interests.map((tag: string, i: number) => (
                   <span
-                    key={interest.id || i}
+                    key={`${tag}-${i}`}
                     className="px-3 py-1.5 bg-cupid-50 dark:bg-cupid-900/20 text-cupid-600 dark:text-cupid-400 rounded-full text-sm font-medium"
                   >
-                    {interest.interest_tag}
+                    {tag}
                   </span>
                 ))}
               </div>
             )}
 
-            {/* Photo grid */}
+            {/* Photo grid — canonical shape: string[] */}
             {photos.length > 1 && (
               <div className="grid grid-cols-3 gap-2 mt-5">
-                {photos.slice(0, 6).map((photo: any, i: number) => (
-                  <div key={photo.id || i} className="aspect-square rounded-xl overflow-hidden bg-dark-100 dark:bg-dark-800">
-                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                {photos.slice(0, 6).map((url: string, i: number) => (
+                  <div key={i} className="aspect-square rounded-xl overflow-hidden bg-dark-100 dark:bg-dark-800">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>

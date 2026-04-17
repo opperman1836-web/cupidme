@@ -5,7 +5,7 @@ import { rateLimit } from '../middleware/rateLimit.middleware';
 import { createProfileSchema, updateProfileSchema, addPhotoSchema, setInterestsSchema } from '../validators/user.validator';
 import {
   getProfile, createProfile, updateProfile,
-  addPhoto, deletePhoto, setInterests,
+  addPhoto, replacePhotos, deletePhoto, setInterests,
   discover, submitVerification,
 } from '../controllers/user.controller';
 
@@ -17,7 +17,8 @@ userRoutes.get('/me', getProfile);
 userRoutes.get('/profile/:userId', getProfile);
 userRoutes.post('/profile', validate(createProfileSchema), createProfile);
 userRoutes.patch('/profile', validate(updateProfileSchema), updateProfile);
-userRoutes.post('/photos', validate(addPhotoSchema), addPhoto);
+userRoutes.put('/photos', replacePhotos);                             // Canonical: replace-all
+userRoutes.post('/photos', validate(addPhotoSchema), addPhoto);       // Legacy: single
 userRoutes.delete('/photos/:photoId', deletePhoto);
 userRoutes.put('/interests', validate(setInterestsSchema), setInterests);
 userRoutes.get('/discover', rateLimit(20, 60000), discover);

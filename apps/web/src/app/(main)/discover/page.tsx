@@ -18,15 +18,16 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { useToastStore } from '@/components/ui/Toast';
 import { SwipeTutorial } from '@/components/SwipeTutorial';
 
+// Canonical profile shape from backend API
 interface DiscoverProfile {
   user_id: string;
   display_name: string;
   bio: string | null;
   city: string;
-  date_of_birth: string;
+  age: number | null;
   is_verified: boolean;
-  user_photos: { url: string; is_primary: boolean; position: number }[];
-  user_interests: { interest_tag: string; category: string }[];
+  photos: string[];      // array of public URLs
+  interests: string[];   // array of tags
 }
 
 // ── Haptics helper — fails silently on desktop ──
@@ -34,7 +35,7 @@ function haptic(pattern: number | number[]) {
   try { navigator?.vibrate?.(pattern); } catch {}
 }
 
-function getAge(dob: string): number | null {
+function getAge(dob: string | undefined | null): number | null {
   if (!dob) return null;
   return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 }
@@ -127,18 +128,19 @@ function MatchPopup({
 
 // ── Profile Detail Content (for BottomSheet) ──
 function ProfileDetail({ profile }: { profile: DiscoverProfile }) {
-  const photos = profile.user_photos?.sort((a, b) => a.position - b.position) || [];
-  const age = getAge(profile.date_of_birth);
+  const photos = Array.isArray(profile.photos) ? profile.photos : [];
+  const interests = Array.isArray(profile.interests) ? profile.interests : [];
+  const age = profile.age;
 
   return (
     <div className="space-y-6">
       {/* Photo carousel */}
       {photos.length > 0 && (
         <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 -mx-2 px-2">
-          {photos.map((photo, i) => (
+          {photos.map((url, i) => (
             <img
               key={i}
-              src={photo.url}
+              src={url}
               alt={`${profile.display_name} photo ${i + 1}`}
               className="w-64 h-80 object-cover rounded-2xl snap-center flex-shrink-0 shadow-lg"
               draggable={false}
@@ -166,13 +168,13 @@ function ProfileDetail({ profile }: { profile: DiscoverProfile }) {
       )}
 
       {/* Interests */}
-      {profile.user_interests?.length > 0 && (
+      {interests.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-dark-500 mb-2">Interests</h3>
           <div className="flex flex-wrap gap-2">
-            {profile.user_interests.map((i) => (
-              <span key={i.interest_tag} className="px-3 py-1.5 bg-dark-100 dark:bg-dark-800 text-dark-700 dark:text-dark-300 rounded-full text-sm font-medium">
-                {i.interest_tag}
+            {interests.map((tag, i) => (
+              <span key={`${tag}-${i}`} className="px-3 py-1.5 bg-dark-100 dark:bg-dark-800 text-dark-700 dark:text-dark-300 rounded-full text-sm font-medium">
+                {tag}
               </span>
             ))}
           </div>
@@ -224,9 +226,9 @@ export default function DiscoverPage() {
     [1, 2].forEach((offset) => {
       const next = profiles[currentIndex + offset];
       if (!next) return;
-      (next.user_photos || []).forEach((p) => {
+      (next.photos || []).forEach((url) => {
         const img = new window.Image();
-        img.src = p.url;
+        img.src = url;
       });
     });
   }, [currentIndex, profiles]);
@@ -348,10 +350,10 @@ export default function DiscoverPage() {
     );
   }
 
-  const photos = profile.user_photos?.sort((a, b) => a.position - b.position) || [];
-  const currentPhoto = photos[photoIndex]?.url;
-  const age = getAge(profile.date_of_birth);
-  const interests = profile.user_interests || [];
+  const photos: string[] = Array.isArray(profile.photos) ? profile.photos : [];
+  const currentPhoto = photos[photoIndex];
+  const age = profile.age ?? null;
+  const interests: string[] = Array.isArray(profile.interests) ? profile.interests : [];
 
   return (
     <div className="max-w-md mx-auto relative select-none" style={{ minHeight: '85vh' }}>
@@ -364,8 +366,8 @@ export default function DiscoverPage() {
             className="absolute inset-4 rounded-3xl overflow-hidden bg-dark-100 dark:bg-dark-800"
             style={{ transform: 'scale(0.90)', opacity: 0.3 }}
           >
-            {thirdProfile.user_photos?.[0]?.url ? (
-              <img src={thirdProfile.user_photos[0].url} alt="" className="w-full h-full object-cover" draggable={false} />
+            {thirdProfile.photos?.[0] ? (
+              <img src={thirdProfile.photos[0]} alt="" className="w-full h-full object-cover" draggable={false} />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-cupid-100 to-cupid-200 dark:from-cupid-900/30 dark:to-cupid-800/30 flex items-center justify-center">
                 <Camera className="w-12 h-12 text-dark-300" />
@@ -380,8 +382,8 @@ export default function DiscoverPage() {
             style={{ scale: nextScale, opacity: nextOpacity }}
             className="absolute inset-2 rounded-3xl overflow-hidden shadow-lg bg-dark-100 dark:bg-dark-800"
           >
-            {nextProfile.user_photos?.[0]?.url ? (
-              <img src={nextProfile.user_photos[0].url} alt="" className="w-full h-full object-cover" draggable={false} />
+            {nextProfile.photos?.[0] ? (
+              <img src={nextProfile.photos[0]} alt="" className="w-full h-full object-cover" draggable={false} />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-cupid-100 to-cupid-200 dark:from-cupid-900/30 dark:to-cupid-800/30 flex items-center justify-center">
                 <Camera className="w-12 h-12 text-dark-300" />
@@ -468,9 +470,9 @@ export default function DiscoverPage() {
                 </div>
                 {interests.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
-                    {interests.slice(0, 5).map((interest) => (
-                      <span key={interest.interest_tag} className="px-3 py-1 bg-white/10 backdrop-blur-md text-white/90 rounded-full text-xs font-medium border border-white/10">
-                        {interest.interest_tag}
+                    {interests.slice(0, 5).map((tag, idx) => (
+                      <span key={`${tag}-${idx}`} className="px-3 py-1 bg-white/10 backdrop-blur-md text-white/90 rounded-full text-xs font-medium border border-white/10">
+                        {tag}
                       </span>
                     ))}
                     {interests.length > 5 && <span className="px-3 py-1 text-white/50 text-xs">+{interests.length - 5}</span>}

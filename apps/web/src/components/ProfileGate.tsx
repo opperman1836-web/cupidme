@@ -25,7 +25,7 @@ function calculateCompletion(profile: any): { percent: number; missing: string[]
   if (profile?.date_of_birth) score++; else missing.push('Birthday');
   if (profile?.city) score++; else missing.push('Location');
   if (profile?.bio) score++; else missing.push('Bio');
-  if (profile?.user_photos?.length > 0) score++; else missing.push('Photo');
+  if (profile?.photos?.length > 0 || profile?.user_photos?.length > 0) score++; else missing.push('Photo');
 
   return { percent: Math.round((score / total) * 100), missing };
 }
