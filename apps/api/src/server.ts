@@ -17,6 +17,7 @@ import { duelRoutes } from './routes/duel.routes';
 import { inviteRoutes } from './routes/invite.routes';
 import { notificationRoutes } from './routes/notification.routes';
 import { publicRoutes } from './routes/public.routes';
+import { devRoutes } from './routes/dev.routes';
 
 const app = express();
 
@@ -60,6 +61,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 // Routes
 app.use('/api/public', publicRoutes); // Unauthenticated preview endpoints
+if (env.NODE_ENV === 'development') {
+  app.use('/api/dev', devRoutes); // Dev-only seed endpoints — NEVER enabled in prod
+}
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/matches', matchRoutes);
