@@ -31,7 +31,4 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: JWT_SECRET
-        sync: false
-      - key: JWT_EXPIRES_IN
-        value: "7d"
+      # NOTE: JWT_SECRET removed — auth uses Supabase JWTs exclusively

@@ -22,12 +22,7 @@ export const env = {
   // Claude
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
 
-  // JWT
-  JWT_SECRET: process.env.JWT_SECRET || (() => {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('JWT_SECRET must be set in production');
-    }
-    return 'dev-secret-change-me';
-  })(),
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  // NOTE: JWT_SECRET / JWT_EXPIRES_IN were removed — auth uses Supabase JWTs
+  // exclusively via supabaseAdmin.auth.getUser(token). No custom JWT signing
+  // or verification is performed by this backend.
 } as const;

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { Compass, Heart, Swords, MapPin, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,11 @@ export function BottomNav() {
               )}
             >
               {active && (
-                <span className="absolute -top-px inset-x-3 h-0.5 bg-cupid-500 rounded-b-full" />
+                <motion.span
+                  layoutId="bottomnav-indicator"
+                  className="absolute -top-px inset-x-1 h-[3px] bg-cupid-500 rounded-b-full"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
               )}
               <Icon className="w-5 h-5" fill={active ? 'currentColor' : 'none'} />
               <span className="text-[10px] font-medium">{label}</span>

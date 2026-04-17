@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { AppError, NotFoundError } from '../utils/errors';
 import { calculateAge } from '../utils/helpers';
+import { logger } from '../utils/logger';
 
 export class UserService {
   async getProfile(userId: string) {
@@ -11,13 +12,20 @@ export class UserService {
       .single();
 
     if (error || !data) {
-      // Return null instead of throwing — profile may not exist yet
       return null;
     }
     return data;
   }
 
-  async createProfile(userId: string, input: {
+  /**
+   * Create OR update a profile. UPSERT on user_id — never throws duplicate key errors.
+   *
+   * CRITICAL: profile_complete is ALWAYS forced to true.
+   * The Zod schema at the route level already validates that all required fields
+   * (display_name, date_of_birth, gender, gender_preference, city) are present.
+   * If validation passed, the profile IS complete. No further field checks needed.
+   */
+  async upsertProfile(userId: string, input: {
     display_name: string;
     bio?: string;
     date_of_birth: string;
@@ -34,17 +42,57 @@ export class UserService {
     const age = calculateAge(input.date_of_birth);
     if (age < 18) throw new AppError('Must be at least 18 years old');
 
+    // FORCE profile_complete = true. No fragile field checks.
+    // Zod already validated all required fields exist → profile is complete.
+    const profileData = {
+      user_id: userId,
+      ...input,
+      profile_complete: true,
+      updated_at: new Date().toISOString(),
+    };
+
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .insert({ user_id: userId, ...input })
+      .upsert(profileData, { onConflict: 'user_id' })
       .select()
       .single();
 
-    if (error) throw new AppError(error.message);
+    if (error) {
+      logger.error('[Profile] Upsert failed', { userId, error: error.message, code: error.code });
+      throw new AppError(error.message);
+    }
+
+    logger.info('[Profile] Upserted successfully', {
+      userId,
+      profileComplete: data.profile_complete,
+    });
     return data;
   }
 
-  async updateProfile(userId: string, updates: Record<string, unknown>) {
+  /**
+   * Partial update of an existing profile.
+   * NEVER resets profile_complete to false — once complete, always complete.
+   */
+  async updateProfile(userId: string, updates: {
+    display_name?: string;
+    bio?: string;
+    date_of_birth?: string;
+    gender?: string;
+    gender_preference?: string;
+    city?: string;
+    province?: string;
+    latitude?: number;
+    longitude?: number;
+    max_distance_km?: number;
+    age_range_min?: number;
+    age_range_max?: number;
+  }) {
+    if (updates.date_of_birth) {
+      const age = calculateAge(updates.date_of_birth);
+      if (age < 18) throw new AppError('Must be at least 18 years old');
+    }
+
+    // Never include profile_complete in partial updates — it stays true once set.
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -52,7 +100,16 @@ export class UserService {
       .select()
       .single();
 
-    if (error) throw new AppError(error.message);
+    if (error) {
+      logger.error('[Profile] Update failed', { userId, error: error.message });
+      throw new AppError(error.message);
+    }
+
+    if (!data) {
+      throw new NotFoundError('Profile not found. Create one first.');
+    }
+
+    logger.info('[Profile] Updated', { userId, profileComplete: data.profile_complete });
     return data;
   }
 
@@ -80,7 +137,6 @@ export class UserService {
   }
 
   async setInterests(userId: string, interests: { interest_tag: string; category: string }[]) {
-    // Clear existing and re-insert
     await supabaseAdmin.from('user_interests').delete().eq('user_id', userId);
 
     if (interests.length === 0) return [];
@@ -96,7 +152,6 @@ export class UserService {
   }
 
   async getDiscoverFeed(userId: string, page = 1, limit = 20) {
-    // Get current user's profile for preferences
     const { data: myProfile } = await supabaseAdmin
       .from('profiles')
       .select('gender_preference, city, max_distance_km, age_range_min, age_range_max')
@@ -104,11 +159,9 @@ export class UserService {
       .single();
 
     if (!myProfile) {
-      // Return empty feed instead of crashing — user needs to complete profile
       return [];
     }
 
-    // Get users already expressed interest in or matched with
     const { data: excluded } = await supabaseAdmin
       .from('expressed_interests')
       .select('to_user_id')
@@ -123,7 +176,6 @@ export class UserService {
       .not('user_id', 'in', `(${excludedIds.join(',')})`)
       .range((page - 1) * limit, page * limit - 1);
 
-    // Gender preference filter
     if (myProfile.gender_preference !== 'everyone') {
       query = query.eq('gender', myProfile.gender_preference);
     }

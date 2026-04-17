@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { rateLimit } from '../middleware/rateLimit.middleware';
-import { createProfileSchema, addPhotoSchema, setInterestsSchema } from '../validators/user.validator';
+import { createProfileSchema, updateProfileSchema, addPhotoSchema, setInterestsSchema } from '../validators/user.validator';
 import {
   getProfile, createProfile, updateProfile,
   addPhoto, deletePhoto, setInterests,
@@ -16,7 +16,7 @@ userRoutes.use(requireAuth);
 userRoutes.get('/me', getProfile);
 userRoutes.get('/profile/:userId', getProfile);
 userRoutes.post('/profile', validate(createProfileSchema), createProfile);
-userRoutes.patch('/profile', updateProfile);
+userRoutes.patch('/profile', validate(updateProfileSchema), updateProfile);
 userRoutes.post('/photos', validate(addPhotoSchema), addPhoto);
 userRoutes.delete('/photos/:photoId', deletePhoto);
 userRoutes.put('/interests', validate(setInterestsSchema), setInterests);

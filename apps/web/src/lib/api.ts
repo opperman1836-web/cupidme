@@ -1,12 +1,71 @@
+import { useAuthStore } from '@/stores/authStore';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface FetchOptions extends RequestInit {
   token?: string;
+  _isRetry?: boolean;
+}
+
+/**
+ * Get the current access token — uses explicit token if provided,
+ * otherwise reads from the Zustand auth store automatically.
+ */
+function resolveToken(explicit?: string): string | null {
+  if (explicit) return explicit;
+  return useAuthStore.getState().accessToken;
+}
+
+/**
+ * Attempt to refresh the access token using the stored refresh token.
+ * Updates the Zustand store with new tokens on success.
+ * Returns the new access token, or null if refresh failed.
+ */
+async function tryRefreshToken(): Promise<string | null> {
+  const { refreshToken, setTokens, clearAuth } = useAuthStore.getState();
+  if (!refreshToken) {
+    console.warn('[Auth] No refresh token available — clearing session');
+    clearAuth();
+    return null;
+  }
+
+  try {
+    console.info('[Auth] Access token expired — attempting refresh...');
+    const res = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!res.ok) {
+      console.warn('[Auth] Refresh failed — clearing session and redirecting to login');
+      clearAuth();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      return null;
+    }
+
+    const data = await res.json();
+    const { access_token, refresh_token: newRefresh } = data.data;
+    const userId = useAuthStore.getState().userId;
+    setTokens(access_token, newRefresh, userId!);
+    console.info('[Auth] Token refreshed successfully');
+    return access_token;
+  } catch (err) {
+    console.error('[Auth] Refresh request failed:', err);
+    clearAuth();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    return null;
+  }
 }
 
 async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
-  const { token, ...fetchOptions } = options;
+  const { token: explicitToken, _isRetry, ...fetchOptions } = options;
 
+  const token = resolveToken(explicitToken);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -32,6 +91,16 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
       });
 
       clearTimeout(timeout);
+
+      // Handle 401 — attempt token refresh once, then retry
+      if (res.status === 401 && !_isRetry && !path.includes('/auth/')) {
+        console.warn(`[Auth] 401 on ${path} — token may be expired`);
+        const newToken = await tryRefreshToken();
+        if (newToken) {
+          return apiFetch<T>(path, { ...options, token: newToken, _isRetry: true });
+        }
+        throw new Error('Session expired. Please log in again.');
+      }
 
       // Try to parse JSON
       let data: any;

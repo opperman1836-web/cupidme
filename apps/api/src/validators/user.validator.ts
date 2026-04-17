@@ -15,6 +15,13 @@ export const createProfileSchema = z.object({
   age_range_max: z.number().int().max(100).optional(),
 });
 
+/**
+ * Partial version of createProfileSchema for PATCH updates.
+ * All fields are optional — only the fields being changed need to be sent.
+ * Prevents unvalidated data from reaching the DB.
+ */
+export const updateProfileSchema = createProfileSchema.partial();
+
 export const addPhotoSchema = z.object({
   url: z.string().url(),
   position: z.number().int().min(1).max(6),
