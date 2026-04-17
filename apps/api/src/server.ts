@@ -16,6 +16,7 @@ import { webhookRoutes } from './routes/webhook.routes';
 import { duelRoutes } from './routes/duel.routes';
 import { inviteRoutes } from './routes/invite.routes';
 import { notificationRoutes } from './routes/notification.routes';
+import { publicRoutes } from './routes/public.routes';
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 // Routes
+app.use('/api/public', publicRoutes); // Unauthenticated preview endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/matches', matchRoutes);
