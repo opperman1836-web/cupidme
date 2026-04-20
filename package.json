@@ -1,26 +1,31 @@
 {
-  "name": "cupidme",
-  "version": "0.1.0",
-  "private": true,
-  "description": "CupidMe.org - Where Love Is Earned",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "dev:api": "npm run dev --workspace=@cupidme/api",
-    "dev:web": "npm run dev --workspace=@cupidme/web",
-    "build:api": "npm run build --workspace=@cupidme/api",
-    "build:web": "npm run build --workspace=@cupidme/web"
-  },
-  "devDependencies": {
-    "turbo": "^2.3.0",
-    "typescript": "^5.4.0"
-  },
-  "engines": {
-    "node": "20.x"
-  }
+"name": "cupidme",
+"version": "0.1.0",
+"private": true,
+"packageManager": "npm@10.0.0",
+"description": "CupidMe.org - Where Love Is Earned",
+
+"workspaces": [
+"apps/*",
+"packages/*"
+],
+
+"scripts": {
+"dev": "turbo dev",
+"build": "turbo build",
+"lint": "turbo lint",
+"dev:api": "npm run dev --workspace=@cupidme/api",
+"dev:web": "npm run dev --workspace=@cupidme/web",
+"build:api": "npm run build --workspace=@cupidme/api",
+"build:web": "npm run build --workspace=@cupidme/web"
+},
+
+"devDependencies": {
+"turbo": "^2.3.0",
+"typescript": "^5.4.0"
+},
+
+"engines": {
+"node": "20.x"
+}
 }

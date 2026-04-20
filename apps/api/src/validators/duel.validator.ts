@@ -17,3 +17,7 @@ export const answerDuelSchema = z.object({
 export const purchaseCreditsSchema = z.object({
   package: z.enum(['5_credits', '20_credits']),
 });
+
+export const rejectDuelSchema = z.object({
+  reason: z.string().max(280).optional(),
+});

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Swords, Zap, Crown, Gift, ArrowRight, Users,
-  Sparkles, Clock, CreditCard, Star, Heart,
+  Sparkles, Clock, CreditCard, Star, Heart, Hourglass, Check, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -35,29 +35,61 @@ function DuelInviteContent() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [myDuels, setMyDuels] = useState<any[]>([]);
+  const [incoming, setIncoming] = useState<any[]>([]);
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
+
+  async function refreshAll() {
+    try {
+      const [matchRes, creditRes, duelRes, incomingRes] = await Promise.all([
+        api.get<any>('/api/matches', token!),
+        api.get<any>('/api/duels/credits/balance', token!),
+        api.get<any>('/api/duels/my', token!),
+        api.get<any>('/api/duels/incoming', token!),
+      ]);
+      setMatches((matchRes.data || []).filter((m: any) => m.status === 'unlocked'));
+      setCredits(creditRes.data);
+      setMyDuels(duelRes.data || []);
+      setIncoming(incomingRes.data || []);
+    } catch { /* user may have no matches yet */ }
+  }
 
   useEffect(() => {
     async function load() {
-      try {
-        const [matchRes, creditRes, duelRes] = await Promise.all([
-          api.get<any>('/api/matches', token!),
-          api.get<any>('/api/duels/credits/balance', token!),
-          api.get<any>('/api/duels/my', token!),
-        ]);
-        setMatches((matchRes.data || []).filter((m: any) => m.status === 'unlocked'));
-        setCredits(creditRes.data);
-        setMyDuels(duelRes.data || []);
-      } catch { /* ignore — user may have no matches yet */ }
+      await refreshAll();
       setLoading(false);
     }
-
     if (token) {
       load();
     } else {
-      // No token yet — stop loading spinner (user just registered, store hydrating)
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  async function acceptIncoming(duelId: string) {
+    setRespondingTo(duelId);
+    try {
+      await api.post(`/api/duels/${duelId}/accept`, {}, token!);
+      addToast('Challenge accepted!', 'success');
+      router.push(`/duel/play/${duelId}`);
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to accept', 'error');
+      setRespondingTo(null);
+    }
+  }
+
+  async function rejectIncoming(duelId: string) {
+    setRespondingTo(duelId);
+    try {
+      await api.post(`/api/duels/${duelId}/reject`, {}, token!);
+      addToast('Challenge declined', 'success');
+      await refreshAll();
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to decline', 'error');
+    } finally {
+      setRespondingTo(null);
+    }
+  }
 
   async function handleCreateDuel() {
     if (!selectedMatch) {
@@ -76,7 +108,7 @@ function DuelInviteContent() {
         type: selectedType,
       }, token!);
 
-      addToast('Duel created! Starting...', 'success');
+      addToast('Challenge sent — waiting for them to accept', 'success');
       router.push(`/duel/play/${res.data.id}`);
     } catch (err: any) {
       addToast(err.message || 'Failed to create duel', 'error');
@@ -204,6 +236,66 @@ function DuelInviteContent() {
           </div>
         </Card>
       </motion.div>
+
+      {/* Incoming Invitations */}
+      {incoming.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mb-6"
+        >
+          <h2 className="text-lg font-bold text-dark-900 mb-3 flex items-center gap-2">
+            <Hourglass className="w-5 h-5 text-amber-500" />
+            Pending Challenges
+            <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+              {incoming.length}
+            </span>
+          </h2>
+          <div className="space-y-2">
+            {incoming.map((inv: any) => {
+              const isResponding = respondingTo === inv.id;
+              return (
+                <Card key={inv.id} className="!py-3 border-amber-200">
+                  <div className="flex items-center gap-4">
+                    <Avatar
+                      src={inv.inviter?.primary_photo_url}
+                      alt={inv.inviter?.display_name || '?'}
+                      size="md"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-dark-900 truncate">
+                        {inv.inviter?.display_name || 'Someone'}
+                      </p>
+                      <p className="text-xs text-dark-500 capitalize">
+                        challenged you to a {String(inv.type).replace('_', ' ')} duel
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => rejectIncoming(inv.id)}
+                        disabled={isResponding}
+                        className="w-9 h-9 rounded-xl bg-dark-100 hover:bg-red-100 text-dark-500 hover:text-red-600 flex items-center justify-center transition-colors disabled:opacity-50"
+                        aria-label="Decline"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => acceptIncoming(inv.id)}
+                        disabled={isResponding}
+                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-cupid-500 to-purple-600 text-white flex items-center justify-center disabled:opacity-50"
+                        aria-label="Accept"
+                      >
+                        <Check className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Duel Type Selection */}
       <motion.div

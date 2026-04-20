@@ -27,6 +27,14 @@ export const addPhotoSchema = z.object({
   position: z.number().int().min(1).max(6),
 });
 
+/**
+ * PUT /api/users/photos — replace-all photo URLs.
+ * Accepts an array of 0-10 valid URLs. An empty array clears all photos.
+ */
+export const replacePhotosSchema = z.object({
+  photos: z.array(z.string().url()).max(10),
+});
+
 export const setInterestsSchema = z.object({
   interests: z.array(z.object({
     interest_tag: z.string(),

@@ -11,8 +11,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+// ── Scoring constants ──
+// Per-question points come ONLY from speed (0-5). Compatibility points are
+// awarded at completion (+20 per matching answer). This guarantees:
+//   • Different answers produce different scores (compat bonus varies).
+//   • Same answers produce different scores by speed.
+//   • A user who picks slowly and never matches their opponent ends near 0.
+//   • A user who picks fast and matches every answer ends near 125 (5*5 + 5*20).
+const SPEED_POINTS_MAX     = 5;   // max per question from speed
+const COMPATIBILITY_BONUS  = 20;  // per matching answer at completion
+
 export class DuelService {
   // ── Create a duel ──
+  // Non-practice duels start as 'pending' — opponent must explicitly accept
+  // before either user can /start. Practice (self-) duels auto-accept.
   async createDuel(userId: string, input: {
     opponent_id?: string;
     match_id?: string;
@@ -20,7 +32,7 @@ export class DuelService {
   }) {
     const opponentId = input.opponent_id;
 
-    // Prevent self-duel (except practice mode which has no opponent)
+    // Prevent self-duel via opponent_id (practice mode is requested by omitting opponent_id)
     if (opponentId && opponentId === userId) {
       throw new AppError('You cannot duel yourself. Use practice mode instead.');
     }
@@ -34,14 +46,16 @@ export class DuelService {
 
     if (!opponent || !opponent.is_active) throw new NotFoundError('Opponent');
 
-    await this.deductCredit(userId);
-
+    // Don't deduct a credit until the opponent accepts. Avoids burning credits
+    // on declined invites. Deduction happens in acceptDuel() / startDuel().
     const { data: existing } = await supabaseAdmin
       .from('duels').select('id')
       .or(`and(user1_id.eq.${userId},user2_id.eq.${opponentId}),and(user1_id.eq.${opponentId},user2_id.eq.${userId})`)
-      .in('status', ['pending', 'active']).limit(1);
+      .in('status', ['pending', 'accepted', 'active']).limit(1);
 
-    if (existing && existing.length > 0) throw new AppError('Active duel already exists with this user');
+    if (existing && existing.length > 0) {
+      throw new AppError('You already have an active or pending duel with this user');
+    }
 
     // Validate match_id ownership if provided
     if (input.match_id) {
@@ -70,10 +84,13 @@ export class DuelService {
 
     if (error) throw new AppError(error.message);
 
-    // Non-critical: notify opponent
+    // Notify opponent so they can accept/reject from their notifications.
     await supabaseAdmin.from('notifications').insert({
-      user_id: opponentId, type: 'system', title: 'Duel Challenge!',
-      body: 'Someone challenged you to a Cupid Duel!', data: { duel_id: duel.id },
+      user_id: opponentId,
+      type: 'system',
+      title: 'Duel Challenge!',
+      body: 'Someone challenged you to a Cupid Duel — tap to accept.',
+      data: { duel_id: duel.id, action: 'duel_invite' },
     }); // error ignored — non-critical
 
     return duel;
@@ -85,9 +102,12 @@ export class DuelService {
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
+    // Practice = self-duel; auto-accepted so /start works immediately.
+    const now = new Date().toISOString();
     const { data: duel, error } = await supabaseAdmin.from('duels').insert({
       user1_id: userId, user2_id: userId,
-      type: duelType || 'compatibility', status: 'pending',
+      type: duelType || 'compatibility', status: 'accepted',
+      accepted_at: now,
       total_questions: 5, expires_at: expiresAt.toISOString(),
     }).select().single();
 
@@ -95,7 +115,89 @@ export class DuelService {
     return duel;
   }
 
+  // ── Accept a duel invitation ──
+  // Only the OPPONENT (user2_id) can accept. Deducts a credit from the inviter
+  // because the duel is now real. Returns the updated duel.
+  async acceptDuel(duelId: string, userId: string) {
+    const { data: duel, error } = await supabaseAdmin
+      .from('duels').select('*').eq('id', duelId).single();
+    if (error || !duel) throw new NotFoundError('Duel');
+    if (duel.user2_id !== userId) {
+      throw new AppError('Only the challenged user can accept this duel', 403);
+    }
+    if (duel.status === 'accepted' || duel.status === 'active') {
+      return duel; // idempotent
+    }
+    if (duel.status !== 'pending') {
+      throw new AppError(`Cannot accept a duel with status "${duel.status}"`);
+    }
+
+    // Deduct credit from inviter now that the duel is real
+    await this.deductCredit(duel.user1_id);
+
+    const now = new Date().toISOString();
+    const { data: updated, error: upErr } = await supabaseAdmin
+      .from('duels')
+      .update({ status: 'accepted', accepted_at: now })
+      .eq('id', duelId)
+      .eq('status', 'pending') // optimistic concurrency
+      .select().single();
+    if (upErr) throw new AppError(upErr.message);
+    if (!updated) {
+      // Lost the race — return current state
+      const { data: fresh } = await supabaseAdmin.from('duels').select('*').eq('id', duelId).single();
+      return fresh;
+    }
+
+    // Notify inviter that opponent accepted
+    await supabaseAdmin.from('notifications').insert({
+      user_id: duel.user1_id, type: 'system',
+      title: 'Duel Accepted!',
+      body: 'Your opponent accepted — let the duel begin.',
+      data: { duel_id: duelId, action: 'duel_accepted' },
+    });
+
+    return updated;
+  }
+
+  // ── Reject a duel invitation ──
+  async rejectDuel(duelId: string, userId: string, reason?: string) {
+    const { data: duel, error } = await supabaseAdmin
+      .from('duels').select('*').eq('id', duelId).single();
+    if (error || !duel) throw new NotFoundError('Duel');
+    if (duel.user2_id !== userId) {
+      throw new AppError('Only the challenged user can reject this duel', 403);
+    }
+    if (duel.status === 'rejected' || duel.status === 'cancelled') return duel;
+    if (duel.status !== 'pending') {
+      throw new AppError(`Cannot reject a duel with status "${duel.status}"`);
+    }
+
+    const { data: updated, error: upErr } = await supabaseAdmin
+      .from('duels')
+      .update({
+        status: 'rejected',
+        rejected_at: new Date().toISOString(),
+        rejected_reason: reason || null,
+      })
+      .eq('id', duelId).eq('status', 'pending')
+      .select().single();
+    if (upErr) throw new AppError(upErr.message);
+
+    // Notify inviter
+    await supabaseAdmin.from('notifications').insert({
+      user_id: duel.user1_id, type: 'system',
+      title: 'Duel declined',
+      body: 'Your opponent declined the duel.',
+      data: { duel_id: duelId, action: 'duel_rejected' },
+    });
+
+    return updated;
+  }
+
   // ── Start duel ──
+  // Requires status='accepted' (or 'active' to resume). Generates questions on
+  // the first call; the second caller just gets the existing question set.
   async startDuel(duelId: string, userId: string) {
     const { data: duel, error } = await supabaseAdmin
       .from('duels').select('*').eq('id', duelId).single();
@@ -105,49 +207,46 @@ export class DuelService {
       throw new AppError('Not a participant of this duel', 403);
     }
 
-    // Already active — return existing questions
+    // Active — return existing questions
     if (duel.status === 'active') {
       const { data: questions } = await supabaseAdmin
         .from('duel_questions').select('*').eq('duel_id', duelId).order('question_number');
       return { duel, questions: questions || [] };
     }
 
-    // Already completed
-    if (duel.status === 'completed') {
-      throw new AppError('This duel is already completed');
+    if (duel.status === 'completed') throw new AppError('This duel is already completed');
+    if (duel.status === 'rejected')  throw new AppError('This duel was declined');
+    if (duel.status === 'cancelled') throw new AppError('This duel was cancelled');
+    if (duel.status === 'expired')   throw new AppError('This duel has expired');
+
+    if (duel.status === 'pending') {
+      throw new AppError('Waiting for your opponent to accept this duel');
     }
 
-    if (duel.status !== 'pending') {
-      throw new AppError('Duel cannot be started in current state');
+    if (duel.status !== 'accepted') {
+      throw new AppError(`Cannot start a duel in status "${duel.status}"`);
     }
 
-    // Deduct opponent credit (not for practice)
-    if (userId === duel.user2_id && duel.user1_id !== duel.user2_id) {
-      await this.deductCredit(userId);
-    }
-
-    // Atomically set to active (prevents double-click race condition)
+    // Atomically transition accepted → active (prevents double-init race)
     const { data: activated } = await supabaseAdmin
       .from('duels')
       .update({ status: 'active', started_at: new Date().toISOString() })
-      .eq('id', duelId).eq('status', 'pending') // only if still pending
+      .eq('id', duelId).eq('status', 'accepted')
       .select().single();
 
     if (!activated) {
-      // Someone else already started it — return existing
+      // Lost the race — another caller already activated it
       const { data: q } = await supabaseAdmin
         .from('duel_questions').select('*').eq('duel_id', duelId).order('question_number');
       const { data: d } = await supabaseAdmin.from('duels').select('*').eq('id', duelId).single();
       return { duel: d, questions: q || [] };
     }
 
-    // Clear stale questions (prevents duplicate key error)
+    // Clear any stale questions (defensive)
     await supabaseAdmin.from('duel_questions').delete().eq('duel_id', duelId);
 
-    // Generate questions — ALWAYS succeeds (fallback guaranteed)
+    // Generate questions — fallback guaranteed
     const questions = this.getFallbackQuestions(duel.total_questions);
-
-    // Try AI generation with 5s timeout, but don't block on failure
     try {
       const aiQuestions = await this.generateQuestionsWithTimeout(duel.type, duel.total_questions);
       if (aiQuestions.length >= duel.total_questions) {
@@ -161,7 +260,8 @@ export class DuelService {
       duel_id: duelId, question_number: i + 1,
       question_text: q.question, option_a: q.options[0], option_b: q.options[1],
       option_c: q.options[2] || null, option_d: q.options[3] || null,
-      time_limit_seconds: duel.type === 'rapid_fire' ? 10 : 15, points: 10,
+      time_limit_seconds: duel.type === 'rapid_fire' ? 10 : 15,
+      points: SPEED_POINTS_MAX,  // legacy column; actual scoring uses speed-only here
     }));
 
     const { error: insertError } = await supabaseAdmin.from('duel_questions').insert(questionRows);
@@ -174,6 +274,8 @@ export class DuelService {
   }
 
   // ── Submit answer ──
+  // Per-question points = speed bonus only (0-5). Compatibility bonus is added
+  // in completeDuel() after both users have answered every question.
   async submitAnswer(duelId: string, userId: string, input: {
     question_id: string; answer: string; answered_in_seconds?: number;
   }) {
@@ -189,7 +291,7 @@ export class DuelService {
       .from('duel_questions').select('*').eq('id', input.question_id).eq('duel_id', duelId).single();
     if (!question) throw new NotFoundError('Question');
 
-    // Idempotent — check if already answered
+    // Idempotent — already-answered returns the existing record
     const { data: existingAnswer } = await supabaseAdmin
       .from('duel_answers').select('id, points_earned')
       .eq('question_id', input.question_id).eq('user_id', userId).single();
@@ -198,9 +300,12 @@ export class DuelService {
       return { answer: existingAnswer, points_earned: existingAnswer.points_earned, speed_bonus: 0 };
     }
 
-    const timeUsed = input.answered_in_seconds || question.time_limit_seconds;
-    const speedBonus = Math.max(0, Math.floor((question.time_limit_seconds - timeUsed) / question.time_limit_seconds * 5));
-    const pointsEarned = question.points + speedBonus;
+    // Speed-only points: faster = more points, capped at SPEED_POINTS_MAX
+    const limit = question.time_limit_seconds || 15;
+    const timeUsed = Math.min(input.answered_in_seconds ?? limit, limit);
+    const remainingFraction = Math.max(0, (limit - timeUsed) / limit);
+    const speedBonus  = Math.round(remainingFraction * SPEED_POINTS_MAX);
+    const pointsEarned = speedBonus; // no flat base — compatibility bonus comes later
 
     const { data: answer, error } = await supabaseAdmin.from('duel_answers').insert({
       duel_id: duelId, question_id: input.question_id, user_id: userId,
@@ -208,12 +313,13 @@ export class DuelService {
     }).select().single();
 
     if (error) {
-      if (error.code === '23505') { // unique violation — already answered
+      if (error.code === '23505') {
         return { answer: null, points_earned: pointsEarned, speed_bonus: speedBonus };
       }
       throw new AppError(error.message);
     }
 
+    // Increment running speed-points total on the duel row
     const scoreField = duel.user1_id === userId ? 'user1_score' : 'user2_score';
     await supabaseAdmin.from('duels').update({
       [scoreField]: (duel[scoreField as keyof typeof duel] as number) + pointsEarned,
@@ -233,7 +339,6 @@ export class DuelService {
       throw new AppError('Not a participant', 403);
     }
 
-    // Already completed — return cached result
     if (duel.status === 'completed') {
       return { status: 'completed', compatibility_score: duel.compatibility_score, ai_insight: duel.ai_insight };
     }
@@ -254,30 +359,48 @@ export class DuelService {
     if (!updated) throw new AppError('Duel not found');
 
     if (updated.user1_completed && updated.user2_completed) {
+      // Real scoring: speed points (already in user1_score/user2_score)
+      // + compatibility bonus (calculated from answer matching).
       const compatibility = await this.calculateCompatibility(duelId);
 
+      // Award compatibility bonus to BOTH users — same answer → same bonus.
+      const compatBonus = compatibility.matched_count * COMPATIBILITY_BONUS;
+      const finalUser1Score = (updated.user1_score || 0) + compatBonus;
+      const finalUser2Score = (updated.user2_score || 0) + compatBonus;
+
       await supabaseAdmin.from('duels').update({
-        status: 'completed', completed_at: new Date().toISOString(),
-        compatibility_score: compatibility.score, ai_insight: compatibility.insight,
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        compatibility_score: compatibility.score,
+        ai_insight: compatibility.insight,
+        user1_score: finalUser1Score,
+        user2_score: finalUser2Score,
       }).eq('id', duelId);
 
-      // Update stats
       if (isPractice) {
         const { data: cr } = await supabaseAdmin.from('duel_credits').select('*').eq('user_id', userId).single();
         if (cr) await supabaseAdmin.from('duel_credits').update({ total_duels_played: cr.total_duels_played + 1 }).eq('user_id', userId);
       } else {
-        await this.updateDuelStats(duel);
+        await this.updateDuelStats({ ...duel, user1_score: finalUser1Score, user2_score: finalUser2Score });
       }
 
       if (duel.match_id) {
-        // Non-critical: record relationship event
         await supabaseAdmin.from('relationship_events').insert({
           match_id: duel.match_id, event_type: 'challenge_passed',
           score_deltas: { trust: 5, chemistry: 10, depth: 5 },
-        }); // error ignored — non-critical
+        });
       }
 
-      return { status: 'completed', compatibility_score: compatibility.score, ai_insight: compatibility.insight };
+      return {
+        status: 'completed',
+        compatibility_score: compatibility.score,
+        ai_insight: compatibility.insight,
+        compatibility_bonus: compatBonus,
+        matched_count: compatibility.matched_count,
+        total_questions: compatibility.total_questions,
+        final_user1_score: finalUser1Score,
+        final_user2_score: finalUser2Score,
+      };
     }
 
     return { status: 'waiting_for_opponent' };
@@ -334,8 +457,54 @@ export class DuelService {
       }
       const opId = duel.user1_id === userId ? duel.user2_id : duel.user1_id;
       const { data: p } = await supabaseAdmin.from('profiles').select('display_name, city').eq('user_id', opId).single();
-      return { ...duel, opponent: { id: opId, display_name: p?.display_name || 'Unknown', city: p?.city } };
+      // Mark whether the current user is the inviter or invitee — frontend uses
+      // this to decide whether to show "accept/reject" or "waiting for response"
+      return {
+        ...duel,
+        opponent: { id: opId, display_name: p?.display_name || 'Unknown', city: p?.city },
+        i_am_inviter: duel.user1_id === userId,
+        i_am_invitee: duel.user2_id === userId,
+      };
     }));
+  }
+
+  // Pending invitations TO the user — for the "incoming duels" UI
+  async getPendingInvites(userId: string) {
+    const { data, error } = await supabaseAdmin
+      .from('duels')
+      .select('*')
+      .eq('user2_id', userId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw new AppError(error.message);
+
+    if (!data || data.length === 0) return [];
+
+    const inviterIds = [...new Set(data.map((d: any) => d.user1_id))];
+    const [profilesRes, photosRes] = await Promise.all([
+      supabaseAdmin.from('profiles').select('user_id, display_name, city').in('user_id', inviterIds),
+      supabaseAdmin.from('user_photos').select('user_id, url, position').in('user_id', inviterIds).order('position'),
+    ]);
+
+    const profileBy = new Map<string, any>();
+    (profilesRes.data || []).forEach((p: any) => profileBy.set(p.user_id, p));
+    const primaryPhotoBy = new Map<string, string>();
+    (photosRes.data || []).forEach((ph: any) => {
+      if (!primaryPhotoBy.has(ph.user_id)) primaryPhotoBy.set(ph.user_id, ph.url);
+    });
+
+    return data.map((duel: any) => {
+      const p = profileBy.get(duel.user1_id);
+      return {
+        ...duel,
+        inviter: {
+          id: duel.user1_id,
+          display_name: p?.display_name || 'Unknown',
+          city: p?.city || null,
+          primary_photo_url: primaryPhotoBy.get(duel.user1_id) || null,
+        },
+      };
+    });
   }
 
   // ── Credits ──
@@ -401,28 +570,23 @@ export class DuelService {
   }
 
   async handleCreditPurchase(userId: string, creditsToAdd: number) {
-    // Validate credit amount to prevent abuse
     if (creditsToAdd <= 0 || creditsToAdd > 100) {
       throw new AppError('Invalid credit amount');
     }
-
-    // Use RPC or read-then-write with optimistic check
     const credits = await this.getCredits(userId);
     const { error } = await supabaseAdmin
       .from('duel_credits')
       .update({ credits: credits.credits + creditsToAdd })
       .eq('user_id', userId)
-      .eq('credits', credits.credits); // Optimistic concurrency: only update if credits unchanged
+      .eq('credits', credits.credits);
 
     if (error) {
-      // Retry once on conflict
       const retryCredits = await this.getCredits(userId);
       await supabaseAdmin
         .from('duel_credits')
         .update({ credits: retryCredits.credits + creditsToAdd })
         .eq('user_id', userId);
     }
-
     logger.info(`Added ${creditsToAdd} credits for user ${userId}`);
   }
 
@@ -436,7 +600,7 @@ export class DuelService {
       .from('duel_credits')
       .update({ credits: credits.credits - 1 })
       .eq('user_id', userId)
-      .eq('credits', credits.credits); // Optimistic concurrency check
+      .eq('credits', credits.credits);
     if (error) throw new AppError('Credit deduction failed, please retry');
   }
 
@@ -456,7 +620,7 @@ export class DuelService {
       messages: [{ role: 'user', content: `Generate ${count} dating compatibility quiz questions about ${topic}. Each must have: "question" (max 100 chars), "options" (exactly 4 short answers). Return JSON array only.` }],
     });
 
-    const message = await withTimeout(aiCall, 5000); // 5 second timeout
+    const message = await withTimeout(aiCall, 5000);
     const text = message.content[0].type === 'text' ? message.content[0].text : '[]';
     const parsed = JSON.parse(text);
     if (!Array.isArray(parsed) || parsed.length < count) throw new Error('Invalid AI response');
@@ -479,41 +643,65 @@ export class DuelService {
     return pool.sort(() => Math.random() - 0.5).slice(0, count);
   }
 
+  /**
+   * Compute the compatibility score for a finished duel.
+   * Returns:
+   *   matched_count   – questions where both users picked the same option
+   *   total_questions – questions both users actually answered
+   *   score           – percentage 0-100
+   *   insight         – short qualitative summary (AI-generated when possible)
+   */
   private async calculateCompatibility(duelId: string) {
     const { data: answers } = await supabaseAdmin
-      .from('duel_answers').select('*, duel_questions(question_text)').eq('duel_id', duelId).order('created_at');
+      .from('duel_answers').select('*, duel_questions(question_text)')
+      .eq('duel_id', duelId).order('created_at');
 
     if (!answers || answers.length === 0) {
-      return { score: 50, insight: 'Play more to discover your compatibility!' };
+      return { score: 0, matched_count: 0, total_questions: 0, insight: 'No answers were recorded for this duel.' };
     }
 
     const byQ: Record<string, any[]> = {};
-    for (const a of answers) { if (!byQ[a.question_id]) byQ[a.question_id] = []; byQ[a.question_id].push(a); }
-
-    let matched = 0, total = 0;
-    for (const qa of Object.values(byQ)) {
-      if (qa.length === 2) { total++; if (qa[0].answer === qa[1].answer) matched++; }
-      else if (qa.length === 1) { total++; matched++; } // practice: full score
+    for (const a of answers) {
+      (byQ[a.question_id] ||= []).push(a);
     }
 
-    const score = total > 0 ? Math.round((matched / total) * 100) : 50;
+    let matched = 0;
+    let total = 0;
+    for (const qa of Object.values(byQ)) {
+      if (qa.length === 2) {
+        total++;
+        if (qa[0].answer === qa[1].answer) matched++;
+      } else if (qa.length === 1) {
+        // Practice (self) duel — single answer always "matches" itself
+        total++;
+        matched++;
+      }
+    }
 
-    // Try AI insight with timeout, fallback to static
-    let insight = score >= 70 ? "Great chemistry! You think alike on what matters."
-      : score >= 40 ? "Interesting mix of similarities and differences — exciting!"
-      : "Opposites attract! Different perspectives can complement each other.";
+    const score = total > 0 ? Math.round((matched / total) * 100) : 0;
+
+    // Default insight reflects the actual ratio
+    let insight = total === 0
+      ? 'No paired answers — try playing again.'
+      : score >= 80 ? `Very strong alignment — you matched on ${matched} of ${total} questions.`
+      : score >= 60 ? `Good chemistry — you agreed on ${matched} of ${total} answers.`
+      : score >= 40 ? `Some shared ground — ${matched} of ${total} answers matched.`
+      : score >= 20 ? `Mostly different perspectives — ${matched} of ${total} matched. Opposites can attract.`
+      :               `Very different answers — only ${matched} of ${total} matched. Lots to learn about each other.`;
 
     try {
       const { claude } = await import('../config/claude');
       const msg = await withTimeout(claude.messages.create({
         model: 'claude-sonnet-4-20250514', max_tokens: 200,
-        messages: [{ role: 'user', content: `Write 2 sentences of positive dating compatibility insight for ${score}% match. Be encouraging.` }],
+        messages: [{ role: 'user', content: `Two people just finished a compatibility quiz. They matched on ${matched} of ${total} questions (${score}%). Write 2 short, encouraging sentences explaining what their compatibility says about them as a potential couple.` }],
       }), 5000);
       const t = msg.content[0].type === 'text' ? msg.content[0].text : '';
       if (t.length > 10) insight = t;
-    } catch { /* fallback insight already set */ }
+    } catch {
+      /* keep deterministic fallback */
+    }
 
-    return { score, insight };
+    return { score, matched_count: matched, total_questions: total, insight };
   }
 
   private async updateDuelStats(duel: any) {

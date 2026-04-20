@@ -53,8 +53,23 @@ export class UserService {
     age_range_min?: number;
     age_range_max?: number;
   }): Promise<CanonicalProfile> {
+    logger.info('profile_upsert', {
+      stage: 'start',
+      userId,
+      payload: {
+        display_name: input.display_name,
+        has_bio: !!input.bio,
+        gender: input.gender,
+        gender_preference: input.gender_preference,
+        city: input.city,
+      },
+    });
+
     const age = calculateAge(input.date_of_birth);
-    if (age < 18) throw new AppError('Must be at least 18 years old');
+    if (age < 18) {
+      logger.warn('profile_upsert', { stage: 'rejected', userId, reason: 'under_18' });
+      throw new AppError('Must be at least 18 years old');
+    }
 
     const { error } = await supabaseAdmin
       .from('profiles')
@@ -66,12 +81,26 @@ export class UserService {
       }, { onConflict: 'user_id' });
 
     if (error) {
-      logger.error('[Profile] Upsert failed', { userId, error: error.message, code: error.code });
+      logger.error('profile_upsert', {
+        stage: 'db_error',
+        userId,
+        error: error.message,
+        code: error.code,
+      });
       throw new AppError(error.message);
     }
 
     const profile = await this.getProfile(userId);
-    if (!profile) throw new AppError('Profile not found after upsert');
+    if (!profile) {
+      logger.error('profile_upsert', { stage: 'post_fetch_missing', userId });
+      throw new AppError('Profile not found after upsert');
+    }
+
+    logger.info('profile_upsert', {
+      stage: 'success',
+      userId,
+      profileComplete: profile.profile_complete,
+    });
     return profile;
   }
 
@@ -177,41 +206,66 @@ export class UserService {
     return data;
   }
 
+  /**
+   * Discover feed.
+   *
+   * Filters applied (in order):
+   *   1. profile_complete = true
+   *   2. NOT self
+   *   3. NOT already-swiped (expressed_interests)
+   *   4. Gender preference (mutual: I match their preference, they match mine)
+   *
+   * Empty-state handling: if the strict filters return no results we return [].
+   * The frontend shows an "invite friends / expand search" state — we never
+   * inject fake/demo profiles, since that erodes trust on a brand-new platform.
+   */
   async getDiscoverFeed(userId: string, page = 1, limit = 20): Promise<CanonicalProfile[]> {
     const { data: myProfile } = await supabaseAdmin
       .from('profiles')
-      .select('gender_preference, city, max_distance_km, age_range_min, age_range_max')
+      .select('gender, gender_preference, city, max_distance_km, age_range_min, age_range_max')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (!myProfile) return [];
 
-    const { data: excluded } = await supabaseAdmin
+    // Build exclusion set: self + everyone I've already swiped
+    const { data: alreadySwiped } = await supabaseAdmin
       .from('expressed_interests')
       .select('to_user_id')
       .eq('from_user_id', userId);
-
-    const excludedIds = [userId, ...(excluded?.map((e) => e.to_user_id) || [])];
+    const excludedIds = new Set<string>([userId, ...(alreadySwiped?.map((e: any) => e.to_user_id) || [])]);
 
     let query = supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('profile_complete', true)
-      .not('user_id', 'in', `(${excludedIds.join(',')})`)
+      .not('user_id', 'in', `(${[...excludedIds].map((id) => `"${id}"`).join(',')})`)
       .range((page - 1) * limit, page * limit - 1);
 
+    // Mutual gender preference: I want to see their gender AND they want to see mine
     if (myProfile.gender_preference !== 'everyone') {
       query = query.eq('gender', myProfile.gender_preference);
     }
+    // The other side: they must accept my gender
+    query = query.in('gender_preference', [myProfile.gender, 'everyone']);
 
     const { data: profileRows, error } = await query;
-    if (error) throw new AppError(error.message);
-    if (!profileRows || profileRows.length === 0) return [];
+    if (error) {
+      logger.error('discover_query_failed', { userId, error: error.message });
+      throw new AppError(error.message);
+    }
+
+    logger.info('discover_query', { userId, count: profileRows?.length ?? 0 });
+
+    if (!profileRows || profileRows.length === 0) {
+      return [];
+    }
 
     const userIds = profileRows.map((p: any) => p.user_id);
-    const [photosRes, interestsRes] = await Promise.all([
+    const [photosRes, interestsRes, usersRes] = await Promise.all([
       supabaseAdmin.from('user_photos').select('user_id, url, position, is_primary').in('user_id', userIds),
       supabaseAdmin.from('user_interests').select('user_id, interest_tag, category').in('user_id', userIds),
+      supabaseAdmin.from('users').select('id, is_verified').in('id', userIds),
     ]);
 
     const photosByUser = new Map<string, any[]>();
@@ -228,11 +282,17 @@ export class UserService {
       interestsByUser.set(i.user_id, list);
     });
 
+    const verifiedById = new Map<string, boolean>();
+    (usersRes.data || []).forEach((u: any) => verifiedById.set(u.id, !!u.is_verified));
+
     return profileRows.map((p: any) =>
-      toCanonicalProfile(p, {
-        photos: photosByUser.get(p.user_id) || [],
-        interests: interestsByUser.get(p.user_id) || [],
-      })
+      toCanonicalProfile(
+        { ...p, is_verified: verifiedById.get(p.user_id) ?? false },
+        {
+          photos: photosByUser.get(p.user_id) || [],
+          interests: interestsByUser.get(p.user_id) || [],
+        }
+      )
     );
   }
 

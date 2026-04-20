@@ -64,3 +64,24 @@ export async function purchaseCredits(req: AuthRequest, res: Response, next: Nex
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
+
+export async function acceptDuel(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const duel = await duelService.acceptDuel(req.params.id, req.userId!);
+    res.json({ success: true, data: duel });
+  } catch (err) { next(err); }
+}
+
+export async function rejectDuel(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const duel = await duelService.rejectDuel(req.params.id, req.userId!, req.body?.reason);
+    res.json({ success: true, data: duel });
+  } catch (err) { next(err); }
+}
+
+export async function getPendingInvites(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const invites = await duelService.getPendingInvites(req.userId!);
+    res.json({ success: true, data: invites });
+  } catch (err) { next(err); }
+}

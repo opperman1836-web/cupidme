@@ -47,37 +47,6 @@ function useReveal() {
   return { ref, isInView };
 }
 
-// Animated counter component
-function AnimatedCounter({ target, suffix = '', prefix = '' }: { target: number; suffix?: string; prefix?: string }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true });
-
-  useEffect(() => {
-    if (!isInView) return;
-    const duration = 2000;
-    const steps = 60;
-    const increment = target / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= target) {
-        setCount(target);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(current));
-      }
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [isInView, target]);
-
-  return (
-    <span ref={ref} className="stat-number">
-      {prefix}{count.toLocaleString()}{suffix}
-    </span>
-  );
-}
-
 // Floating hearts background
 function FloatingHearts() {
   return (
@@ -199,6 +168,25 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-dark-50 overflow-hidden">
+      {/* ── TEMP BUILD-VERIFICATION MARKER — delete once confirmed live ── */}
+      <div
+        id="cupidme-build-marker"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          background: 'red',
+          color: 'white',
+          fontSize: '20px',
+          fontWeight: 'bold',
+          padding: '8px 16px',
+          textAlign: 'center',
+        }}
+      >
+        DEBUG: NEW BUILD ACTIVE — fake stats removed
+      </div>
       {/* Navigation */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -265,7 +253,9 @@ export default function LandingPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="text-sm font-semibold text-cupid-700">2,847 people joined this week</span>
+            <span className="text-sm font-semibold text-cupid-700">
+              We are a new dating platform — be among the first to connect
+            </span>
           </motion.div>
 
           {/* Main Headline — emotional + curiosity */}
@@ -327,12 +317,12 @@ export default function LandingPage() {
               AI-Verified Profiles
             </span>
             <span className="flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-amber-500" />
-              850+ Venue Partners
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              Just Launched
             </span>
             <span className="flex items-center gap-1.5">
               <Heart className="w-4 h-4 text-cupid-500 fill-cupid-500" />
-              12,000+ Matches Made
+              Real Connections
             </span>
           </motion.div>
 
@@ -416,8 +406,25 @@ export default function LandingPage() {
                   ))
                 : profiles.length === 0
                 ? (
-                  <div className="col-span-full text-center py-12 text-dark-400">
-                    Profiles loading…
+                  <div className="col-span-full text-center py-16 px-6">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cupid-400 to-cupid-600 flex items-center justify-center shadow-glow">
+                      <Sparkles className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-black text-dark-900 mb-2">
+                      Be one of the very first
+                    </h3>
+                    <p className="text-dark-500 max-w-sm mx-auto mb-5">
+                      We are a new dating platform — be among the first to connect.
+                      Sign up and your profile shows up here next.
+                    </p>
+                    <Link
+                      href="/register"
+                      className="inline-flex items-center gap-2 btn-premium px-6 py-3 rounded-xl text-sm shadow-lg shadow-cupid-500/30"
+                    >
+                      <Heart className="w-4 h-4 fill-white" />
+                      Claim Your Founding Spot
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
                   </div>
                 )
                 : profiles.map((profile, i) => {
@@ -526,35 +533,36 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Social Proof Stats */}
-      <section ref={stats.ref} className="relative py-20 bg-dark-900">
+      {/* New Platform — Founder Callout */}
+      <section ref={stats.ref} className="relative py-20 bg-dark-900 overflow-hidden">
         <div className="absolute inset-0 bg-hero-pattern opacity-10" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] bg-cupid-500/10 rounded-full blur-3xl pointer-events-none" />
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={stats.isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.8 }}
-          className="max-w-6xl mx-auto px-4 sm:px-6"
+          className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center"
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: 50000, suffix: '+', label: 'Active Users' },
-              { value: 12000, suffix: '+', label: 'Matches Made' },
-              { value: 850, suffix: '+', label: 'Partner Venues' },
-              { value: 4200, suffix: '+', label: 'Dates Sponsored' },
-            ].map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={stats.isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: i * 0.15, duration: 0.5 }}
-              >
-                <div className="text-4xl md:text-5xl font-black text-gradient mb-2">
-                  <AnimatedCounter target={stat.value} suffix={stat.suffix} />
-                </div>
-                <p className="text-dark-400 font-medium text-sm">{stat.label}</p>
-              </motion.div>
-            ))}
+          <div className="inline-flex items-center gap-2 glass-cupid rounded-full px-4 py-1.5 mb-6">
+            <Sparkles className="w-4 h-4 text-cupid-300" />
+            <span className="text-xs font-bold text-cupid-200 uppercase tracking-widest">Just Launched</span>
           </div>
+          <h2 className="text-3xl md:text-5xl font-black text-white text-balance leading-tight">
+            We&apos;re a <span className="text-gradient">new dating platform</span> —
+            be among the first to connect.
+          </h2>
+          <p className="mt-5 text-lg text-dark-400 max-w-xl mx-auto">
+            No inflated numbers. No fake hype. Just a fresh community built on genuine effort
+            and real-world dates. Your profile helps shape who joins next.
+          </p>
+          <Link
+            href="/register"
+            className="mt-8 inline-flex items-center gap-2 btn-premium px-7 py-3.5 rounded-2xl text-sm shadow-lg shadow-cupid-500/30"
+          >
+            <Heart className="w-4 h-4 fill-white" />
+            Claim Your Founding Spot
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </motion.div>
       </section>
 

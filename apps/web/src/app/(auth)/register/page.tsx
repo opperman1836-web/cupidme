@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Heart, Mail, Lock, ArrowRight, Sparkles, Shield, Users, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Sparkles, Shield, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { useToastStore } from '@/components/ui/Toast';
@@ -45,7 +45,9 @@ export default function RegisterPage() {
           <span className="text-xs font-bold text-cupid-500 uppercase tracking-wider">Free to join</span>
         </div>
         <h1 className="text-3xl font-black text-dark-900 mb-1">Your First Challenge Awaits</h1>
-        <p className="text-dark-500 mb-6">Join 50,000+ people finding real connections</p>
+        <p className="text-dark-500 mb-6">
+          We are a new dating platform — be among the first to connect.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
@@ -98,7 +100,7 @@ export default function RegisterPage() {
             <Lock className="w-3.5 h-3.5 text-blue-500" /> Secure
           </span>
           <span className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-cupid-500" /> 50K+ members
+            <Sparkles className="w-3.5 h-3.5 text-cupid-500" /> Founding member
           </span>
         </div>
 

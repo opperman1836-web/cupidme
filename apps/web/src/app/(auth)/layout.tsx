@@ -48,21 +48,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             No mindless swiping. Prove you care through challenges,
             build real connections, and unlock sponsored dates at amazing venues.
           </p>
-          <div className="flex items-center justify-center gap-8 mt-10 text-dark-500">
-            <div className="text-center">
-              <p className="text-2xl font-black text-white">50K+</p>
-              <p className="text-xs">Active Users</p>
-            </div>
-            <div className="w-px h-10 bg-dark-700" />
-            <div className="text-center">
-              <p className="text-2xl font-black text-white">12K+</p>
-              <p className="text-xs">Matches Made</p>
-            </div>
-            <div className="w-px h-10 bg-dark-700" />
-            <div className="text-center">
-              <p className="text-2xl font-black text-white">850+</p>
-              <p className="text-xs">Partner Venues</p>
-            </div>
+          <div className="mt-10 inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-cupid-500/10 border border-cupid-400/20">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <p className="text-sm text-cupid-100">
+              We are a new dating platform — be among the first to connect.
+            </p>
           </div>
         </div>
       </div>

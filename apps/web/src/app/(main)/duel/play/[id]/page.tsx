@@ -4,20 +4,28 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Swords, Clock, Zap, CheckCircle2, Trophy, Heart,
-  ArrowRight, Star, Sparkles, Shield,
+  Swords, Clock, Zap, CheckCircle2, Trophy, ArrowRight, Star,
+  Hourglass, Check, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { useDuelStore } from '@/stores/duelStore';
 import { useDuelRealtime } from '@/hooks/useDuelRealtime';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { useToastStore } from '@/components/ui/Toast';
 
-type Phase = 'loading' | 'countdown' | 'question' | 'answered' | 'completing' | 'done';
+type Phase =
+  | 'loading'
+  | 'pending_inviter'   // I created this; waiting for the other person to accept
+  | 'pending_invitee'   // I was invited; need to accept or reject
+  | 'ready'             // Accepted, awaiting first /start call
+  | 'countdown'
+  | 'question'
+  | 'answered'
+  | 'completing'
+  | 'done'
+  | 'terminal';         // rejected / expired / cancelled
 
-// Haptic feedback — fails silently on desktop
 function haptic(pattern: number | number[]) {
   try { navigator?.vibrate?.(pattern); } catch {}
 }
@@ -38,6 +46,8 @@ export default function DuelPlayPage() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [duel, setDuelLocal] = useState<any>(null);
+  const [terminalMsg, setTerminalMsg] = useState<string>('');
+  const [actionLoading, setActionLoading] = useState(false);
   const [timer, setTimer] = useState(15);
   const [countdownNum, setCountdownNum] = useState(3);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -47,62 +57,172 @@ export default function DuelPlayPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
 
-  // Initialize duel
+  // Initial load — read duel state, then route to appropriate phase
   useEffect(() => {
-    async function init() {
+    async function loadDuel() {
+      if (!token || !duelId) return;
       try {
-        const res = await api.post<any>(`/api/duels/${duelId}/start`, {}, token!);
-        const { duel: d, questions: q } = res.data;
+        const res = await api.get<any>(`/api/duels/${duelId}`, token);
+        const d = res.data;
         setDuelLocal(d);
         setDuel(d);
-        setQuestions(q);
 
-        // Start countdown
-        setPhase('countdown');
-        setCountdownNum(3);
+        const isPractice = d.user1_id === d.user2_id;
+        const iAmInviter = d.user1_id === userId;
+
+        switch (d.status) {
+          case 'pending':
+            // Practice always auto-accepts on the backend, so 'pending' here
+            // is always a real invitation
+            setPhase(iAmInviter ? 'pending_inviter' : 'pending_invitee');
+            break;
+
+          case 'accepted':
+            // Practice creates as 'accepted', so auto-start it for the inviter.
+            if (isPractice) {
+              await beginGame();
+            } else {
+              setPhase('ready');
+            }
+            break;
+
+          case 'active': {
+            // Resume mid-game
+            const startRes = await api.post<any>(`/api/duels/${duelId}/start`, {}, token);
+            const { duel: dd, questions: q } = startRes.data;
+            setDuelLocal(dd);
+            setDuel(dd);
+            setQuestions(q);
+            setPhase('countdown');
+            setCountdownNum(3);
+            break;
+          }
+
+          case 'completed':
+            router.push(`/duel/result/${duelId}`);
+            return;
+
+          case 'rejected':
+            setTerminalMsg('This duel was declined.');
+            setPhase('terminal');
+            break;
+          case 'cancelled':
+            setTerminalMsg('This duel was cancelled.');
+            setPhase('terminal');
+            break;
+          case 'expired':
+            setTerminalMsg('This duel expired without being started.');
+            setPhase('terminal');
+            break;
+
+          default:
+            setTerminalMsg(`Duel is in an unexpected state: ${d.status}.`);
+            setPhase('terminal');
+        }
       } catch (err: any) {
-        addToast(err.message || 'Failed to start duel', 'error');
+        addToast(err?.message || 'Failed to load duel', 'error');
         router.push('/duel/invite');
       }
     }
-    if (token && duelId) {
-      reset();
-      init();
-    }
+
+    reset();
+    loadDuel();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [token, duelId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, duelId, userId]);
 
-  // Countdown effect — with haptic ticks
+  // ── Begin gameplay (called after Accepted → Start, or auto for practice) ──
+  async function beginGame() {
+    setActionLoading(true);
+    try {
+      const res = await api.post<any>(`/api/duels/${duelId}/start`, {}, token!);
+      const { duel: d, questions: q } = res.data;
+      setDuelLocal(d);
+      setDuel(d);
+      setQuestions(q);
+      setPhase('countdown');
+      setCountdownNum(3);
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to start duel', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleAccept() {
+    setActionLoading(true);
+    try {
+      await api.post(`/api/duels/${duelId}/accept`, {}, token!);
+      addToast('Challenge accepted!', 'success');
+      await beginGame();
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to accept', 'error');
+      setActionLoading(false);
+    }
+  }
+
+  async function handleReject() {
+    setActionLoading(true);
+    try {
+      await api.post(`/api/duels/${duelId}/reject`, {}, token!);
+      addToast('Challenge declined', 'success');
+      router.push('/duel/invite');
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to reject', 'error');
+      setActionLoading(false);
+    }
+  }
+
+  // Inviter polls for acceptance every 5s while in pending_inviter
+  useEffect(() => {
+    if (phase !== 'pending_inviter') return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get<any>(`/api/duels/${duelId}`, token!);
+        const d = res.data;
+        if (d.status === 'accepted') {
+          setDuelLocal(d);
+          setPhase('ready');
+        } else if (d.status === 'rejected' || d.status === 'cancelled' || d.status === 'expired') {
+          setDuelLocal(d);
+          setTerminalMsg(
+            d.status === 'rejected' ? 'Your opponent declined this duel.' :
+            d.status === 'expired'  ? 'This duel expired.' : 'This duel was cancelled.'
+          );
+          setPhase('terminal');
+        }
+      } catch {/* network blip — try again */}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [phase, duelId, token]);
+
+  // Countdown effect
   useEffect(() => {
     if (phase !== 'countdown') return;
-
     if (countdownNum <= 0) {
-      haptic([50, 50, 100]); // GO! burst
+      haptic([50, 50, 100]);
       setPhase('question');
       startTimer();
       return;
     }
-
-    haptic(20); // tick on each count
+    haptic(20);
     const t = setTimeout(() => setCountdownNum((n) => n - 1), 1000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, countdownNum]);
 
   function startTimer() {
     const q = questions[currentQuestionIndex];
     if (!q) return;
-
     setTimer(q.time_limit_seconds);
     startTimeRef.current = Date.now();
-
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
       const remaining = Math.max(0, q.time_limit_seconds - elapsed);
       setTimer(Math.ceil(remaining));
-
       if (remaining <= 0) {
         if (timerRef.current) clearInterval(timerRef.current);
         handleAutoSubmit();
@@ -111,27 +231,22 @@ export default function DuelPlayPage() {
   }
 
   const handleAutoSubmit = useCallback(async () => {
-    if (submitting) return; // Already submitting
+    if (submitting) return;
     if (selectedOption) return;
-    // Auto-submit with first option if time runs out
     const q = questions[currentQuestionIndex];
     if (q) {
       await submitAnswer(q.option_a);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestionIndex, questions, selectedOption, submitting]);
 
   async function submitAnswer(answer: string) {
     const q = questions[currentQuestionIndex];
     if (!q || submitting) return;
-
-    // Instant tactile feedback on tap
     haptic(10);
-
     setSubmitting(true);
     setSelectedOption(answer);
-
     if (timerRef.current) clearInterval(timerRef.current);
-
     const answeredIn = (Date.now() - startTimeRef.current) / 1000;
 
     try {
@@ -142,23 +257,16 @@ export default function DuelPlayPage() {
       }, token!);
 
       const pts = res.data.points_earned;
-      const correct = pts > 0;
-
       addScore(pts);
       setPointsEarned(pts);
-      setWasCorrect(correct);
+      // For compatibility duels, "correct" means answered fast enough to score.
+      // The real compatibility bonus is awarded at completion based on opponent's answers.
+      setWasCorrect(pts > 0);
       addAnswer(res.data.answer);
 
-      // Celebrate / commiserate
-      if (correct) {
-        haptic([40, 30, 40]); // Success pulse
-      } else {
-        haptic(120); // Long buzz for wrong
-      }
-
+      if (pts > 0) haptic([40, 30, 40]); else haptic(120);
       setPhase('answered');
 
-      // Move to next question after delay
       setTimeout(() => {
         if (currentQuestionIndex + 1 < questions.length) {
           nextQuestion();
@@ -167,7 +275,7 @@ export default function DuelPlayPage() {
           setWasCorrect(null);
           setSubmitting(false);
           setPhase('countdown');
-          setCountdownNum(1); // Short countdown between questions
+          setCountdownNum(1);
         } else {
           handleComplete();
         }
@@ -202,28 +310,137 @@ export default function DuelPlayPage() {
     ...(currentQ.option_d ? [currentQ.option_d] : []),
   ] : [];
 
-  const optionColors = [
-    'from-cupid-500 to-cupid-600',
-    'from-blue-500 to-blue-600',
-    'from-emerald-500 to-emerald-600',
-    'from-amber-500 to-amber-600',
-  ];
+  // ════════════════════════════════════════════════════
+  // ── PRE-GAME PHASES ──
+  // ════════════════════════════════════════════════════
 
-  // ── LOADING ──
+  // Loading
   if (phase === 'loading') {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        >
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
           <Swords className="w-16 h-16 text-cupid-400 drop-shadow-[0_0_20px_rgba(244,63,94,0.5)]" />
         </motion.div>
       </div>
     );
   }
 
-  // ── COUNTDOWN ──
+  // Inviter waiting on opponent's response
+  if (phase === 'pending_inviter') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-sm">
+          <motion.div
+            animate={{ rotate: [0, 8, -8, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity }}
+            className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(245,158,11,0.35)]"
+          >
+            <Hourglass className="w-12 h-12 text-white" />
+          </motion.div>
+          <h1 className="text-3xl font-black text-white mb-3">Waiting for your opponent</h1>
+          <p className="text-dark-300 leading-relaxed">
+            Your challenge has been sent. The duel will start as soon as they accept.
+            We&apos;ll keep checking — feel free to leave; we&apos;ll notify you.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/duel/invite')}
+            className="mt-8 !text-white !border-white/20 hover:!bg-white/10"
+          >
+            Back to Duels
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Invitee deciding
+  if (phase === 'pending_invitee') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-sm">
+          <div className="w-24 h-24 bg-gradient-to-br from-cupid-400 to-cupid-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(244,63,94,0.35)]">
+            <Swords className="w-12 h-12 text-white" />
+          </div>
+          <h1 className="text-3xl font-black text-white mb-3">You&apos;ve been challenged!</h1>
+          <p className="text-dark-300 leading-relaxed">
+            Accept to play a {duel?.type?.replace('_', ' ') || 'compatibility'} duel — answer 5 questions
+            and discover how compatible you really are.
+          </p>
+          <div className="flex gap-3 mt-8">
+            <Button
+              variant="outline"
+              onClick={handleReject}
+              loading={actionLoading}
+              className="flex-1 !text-white !border-white/20 hover:!bg-white/10"
+            >
+              <X className="w-4 h-4 mr-2" /> Decline
+            </Button>
+            <Button
+              onClick={handleAccept}
+              loading={actionLoading}
+              className="flex-1 bg-gradient-to-r from-cupid-500 to-purple-600 text-white"
+            >
+              <Check className="w-4 h-4 mr-2" /> Accept
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Accepted but not yet started by this client
+  if (phase === 'ready') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-sm">
+          <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(16,185,129,0.35)]">
+            <CheckCircle2 className="w-12 h-12 text-white" />
+          </div>
+          <h1 className="text-3xl font-black text-white mb-3">Ready to duel</h1>
+          <p className="text-dark-300 leading-relaxed">
+            5 questions. 15 seconds each. Speed matters — and so do shared answers.
+            Tap Start when you&apos;re ready.
+          </p>
+          <Button
+            onClick={beginGame}
+            loading={actionLoading}
+            className="mt-8 w-full bg-gradient-to-r from-cupid-500 to-purple-600 text-white !py-4"
+          >
+            <Swords className="w-5 h-5 mr-2" />
+            Start Duel
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Terminal (rejected / expired / cancelled)
+  if (phase === 'terminal') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center px-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-sm">
+          <div className="w-24 h-24 bg-dark-700 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <X className="w-12 h-12 text-dark-300" />
+          </div>
+          <h1 className="text-2xl font-black text-white mb-3">Duel ended</h1>
+          <p className="text-dark-300 leading-relaxed">{terminalMsg}</p>
+          <Button
+            onClick={() => router.push('/duel/invite')}
+            className="mt-8 bg-gradient-to-r from-cupid-500 to-purple-600 text-white"
+          >
+            Back to Duels
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════
+  // ── COUNTDOWN / GAMEPLAY ──
+  // ════════════════════════════════════════════════════
+
   if (phase === 'countdown') {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center">
@@ -252,15 +469,10 @@ export default function DuelPlayPage() {
     );
   }
 
-  // ── COMPLETING (waiting for opponent) ──
   if (phase === 'completing' || phase === 'done') {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 flex items-center justify-center px-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
           <motion.div
             animate={{ rotate: [0, 10, -10, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
@@ -272,38 +484,36 @@ export default function DuelPlayPage() {
             {phase === 'completing' ? 'Finishing up...' : 'Waiting for opponent'}
           </h2>
           <p className="text-dark-300 text-lg mb-2">
-            Your score:{' '}
+            Your speed score:{' '}
             <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-cupid-400 to-purple-400">
               {myScore}
             </span>
           </p>
           {phase === 'done' && (
-            <p className="text-sm text-dark-400 mb-6 max-w-xs mx-auto">
-              Your opponent is still playing. Check back soon!
-            </p>
-          )}
-          {phase === 'done' && (
-            <Button
-              onClick={() => router.push(`/duel/result/${duelId}`)}
-              className="bg-gradient-to-r from-cupid-500 to-cupid-600 hover:from-cupid-600 hover:to-cupid-700 text-white shadow-xl shadow-cupid-500/30"
-            >
-              View Results <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
+            <>
+              <p className="text-sm text-dark-400 mb-6 max-w-xs mx-auto">
+                Your opponent is still playing. The compatibility bonus is added once they finish.
+              </p>
+              <Button
+                onClick={() => router.push(`/duel/result/${duelId}`)}
+                className="bg-gradient-to-r from-cupid-500 to-cupid-600 text-white shadow-xl shadow-cupid-500/30"
+              >
+                View Results <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </>
           )}
         </motion.div>
       </div>
     );
   }
 
-  // ── QUESTION / ANSWERED PHASES ──
+  // Gameplay
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950 overflow-y-auto">
-      {/* Ambient glow accents */}
       <div className="absolute top-0 -right-20 w-80 h-80 bg-cupid-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 -left-20 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative max-w-lg mx-auto px-5 pt-6 pb-10">
-        {/* Top bar */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
             <Swords className="w-4 h-4 text-cupid-400" />
@@ -317,7 +527,6 @@ export default function DuelPlayPage() {
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-8 border border-white/5">
           <motion.div
             className="h-full bg-gradient-to-r from-cupid-400 via-cupid-500 to-purple-500 rounded-full shadow-[0_0_12px_rgba(244,63,94,0.6)]"
@@ -327,7 +536,6 @@ export default function DuelPlayPage() {
           />
         </div>
 
-        {/* Timer */}
         <div className="flex justify-center mb-8">
           <motion.div
             className={`w-24 h-24 rounded-full flex items-center justify-center border-[3px] backdrop-blur-md shadow-xl ${
@@ -347,7 +555,6 @@ export default function DuelPlayPage() {
           </motion.div>
         </div>
 
-        {/* Question Card + Options — with directional slide transitions */}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentQ?.id}
@@ -356,7 +563,6 @@ export default function DuelPlayPage() {
             exit={{ opacity: 0, x: -60, scale: 0.95 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           >
-            {/* Question Card — elevated, readable, fade+scale in */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -371,14 +577,12 @@ export default function DuelPlayPage() {
               </p>
             </motion.div>
 
-            {/* Options — game-feel feedback */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {options.map((option, i) => {
                 const isSelected = selectedOption === option;
                 const isAnswered = phase === 'answered';
                 const isDisabled = isAnswered || submitting;
 
-                // Derive visual state
                 let visualState: 'idle' | 'selected-correct' | 'selected-wrong' | 'faded' = 'idle';
                 if (isAnswered) {
                   if (isSelected) {
@@ -423,9 +627,7 @@ export default function DuelPlayPage() {
                     className={`relative px-5 py-5 rounded-2xl text-left font-semibold transition-all duration-200 ${stateClasses}`}
                   >
                     <div className="flex items-start gap-3">
-                      <span
-                        className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black ${pillClasses}`}
-                      >
+                      <span className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black ${pillClasses}`}>
                         {String.fromCharCode(65 + i)}
                       </span>
                       <p className="text-sm sm:text-base font-bold leading-snug flex-1 pt-1">
@@ -459,7 +661,6 @@ export default function DuelPlayPage() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Floating score feedback — "+X pts" or "Wrong" — shoots up and fades */}
         <AnimatePresence>
           {phase === 'answered' && wasCorrect !== null && (
             <motion.div
@@ -469,7 +670,7 @@ export default function DuelPlayPage() {
               transition={{ duration: 1.4, ease: 'easeOut', times: [0, 0.2, 0.6, 1] }}
               className="fixed top-1/2 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
             >
-              {wasCorrect ? (
+              {wasCorrect && pointsEarned > 0 ? (
                 <div className="flex flex-col items-center">
                   <span className="text-5xl sm:text-6xl font-black bg-gradient-to-br from-emerald-300 via-emerald-400 to-emerald-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(52,211,153,0.6)]">
                     +{pointsEarned}
@@ -477,18 +678,18 @@ export default function DuelPlayPage() {
                   <div className="flex items-center gap-1 mt-1">
                     <Star className="w-5 h-5 text-amber-300" fill="currentColor" />
                     <span className="text-sm font-black text-emerald-300 tracking-wide uppercase">
-                      {pointsEarned >= 90 ? 'Perfect!' : pointsEarned >= 70 ? 'Great!' : 'Nice!'}
+                      Speed bonus
                     </span>
                     <Star className="w-5 h-5 text-amber-300" fill="currentColor" />
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <span className="text-5xl sm:text-6xl font-black bg-gradient-to-br from-red-400 to-red-600 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(248,113,113,0.6)]">
-                    Oops
+                  <span className="text-5xl sm:text-6xl font-black bg-gradient-to-br from-amber-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(245,158,11,0.6)]">
+                    +0
                   </span>
-                  <span className="text-sm font-black text-red-300 tracking-wide uppercase mt-1">
-                    Wrong answer
+                  <span className="text-sm font-black text-amber-300 tracking-wide uppercase mt-1">
+                    Too slow — no speed bonus
                   </span>
                 </div>
               )}

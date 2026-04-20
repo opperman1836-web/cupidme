@@ -5,8 +5,9 @@ import { rateLimit } from '../middleware/rateLimit.middleware';
 import {
   createDuel, startDuel, answerDuel, completeDuel,
   getDuel, getUserDuels, getCredits, claimFreeCredit, purchaseCredits,
+  acceptDuel, rejectDuel, getPendingInvites,
 } from '../controllers/duel.controller';
-import { createDuelSchema, answerDuelSchema, purchaseCreditsSchema } from '../validators/duel.validator';
+import { createDuelSchema, answerDuelSchema, purchaseCreditsSchema, rejectDuelSchema } from '../validators/duel.validator';
 
 export const duelRoutes = Router();
 
@@ -16,6 +17,7 @@ duelRoutes.use(requireAuth);
 // Specific routes MUST come before parameterized routes
 duelRoutes.post('/create', rateLimit(10, 60000), validate(createDuelSchema), createDuel);
 duelRoutes.get('/my', getUserDuels);
+duelRoutes.get('/incoming', getPendingInvites);
 
 // Credits — specific path before /:id catch-all
 duelRoutes.get('/credits/balance', getCredits);
@@ -24,6 +26,8 @@ duelRoutes.post('/credits/purchase', rateLimit(5, 60000), validate(purchaseCredi
 
 // Parameterized routes LAST
 duelRoutes.get('/:id', getDuel);
+duelRoutes.post('/:id/accept', rateLimit(10, 60000), acceptDuel);
+duelRoutes.post('/:id/reject', rateLimit(10, 60000), validate(rejectDuelSchema), rejectDuel);
 duelRoutes.post('/:id/start', startDuel);
 duelRoutes.post('/:id/answer', validate(answerDuelSchema), answerDuel);
 duelRoutes.post('/:id/complete', completeDuel);
