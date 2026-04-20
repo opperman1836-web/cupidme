@@ -88,9 +88,4 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error.message);
 });
 
-const PORT = env.API_PORT || 4000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`CupidMe API running on port ${PORT} (${env.NODE_ENV})`);
-});
-
 export default app;
